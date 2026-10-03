@@ -13,19 +13,18 @@ metaInfo:
     []
   tags:
     []
-  lensName: Untitled
+  lensName: Specs Starter
   lensDescriptors:
     []
   lensApplicability:
     - Front
     - Back
   lensClientCompatibilities:
-    - Mobile
-    - Web
+    - Spectacles
   platformBundlesEnabled: false
   iconHash: ""
   videoPreviewHash: ""
-  fromTemplateName: Default
+  fromTemplateName: Spectacles
   fromTemplateUrl: Lens Studio 5.15.4.26022322
   activationCamera: Front
   sourceMapEnabled: false
@@ -40,5 +39,5 @@ metaInfo:
     minor: 0
     patch: 0
     build: 0
-  documentId: f3d524c5-ac07-44a7-b03a-e07d591396ec
-  originalDocumentId: f3d524c5-ac07-44a7-b03a-e07d591396ec
+  documentId: 31da3704-8538-4589-8607-0c31920dbfdf
+  originalDocumentId: 4492aa5f-47e4-4abe-9643-7d6f708b0869

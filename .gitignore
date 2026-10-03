@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Holo-CAD
+# Pushed models are runtime artifacts. bridge/test_cube.glb is tracked on purpose.
+bridge/models/
