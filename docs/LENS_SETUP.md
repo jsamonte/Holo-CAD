@@ -28,7 +28,7 @@ own object, which is how SIK does it, so they have to sit together.
 | --------- | ---- | ------------------ |
 | `BridgeClient` | WebSocket to FreeCAD, reconnects on its own | `bridgeUrl`, `internetModule` |
 | `ModelLoader` | downloads each GLB, measures it, scales it to true size | `material`, `internetModule`, `remoteMediaModule` |
-| `ModelPlacement` | grab, move and turn. Resizing stays off | `freeScale` |
+| `ModelPlacement` | grab, move, turn, and two handed resize | `allowResize`, `minScale`, `maxScale` |
 | `DimensionOverlay` | wireframe box with the size in mm | `lineMaterial` |
 | `StatusPanel` | connection and model state, optional | `statusText` |
 
@@ -56,6 +56,42 @@ MCP cannot create module assets, since its asset types are only RenderTarget,
 ObjectPrefab, Material, FileTexture, FileAudioTrack and AnimatedTexture.
 Writing the two files straight into `Assets/` does work, and Lens Studio
 imports them and assigns its own ids, which is what the wiring tool relies on.
+
+## Handling the model
+
+**Move and turn it** by grabbing: pinch and drag on the glasses, click and
+drag with the mouse in the Lens Studio preview, which the Spectacles template's
+MouseInteractor provides.
+
+**Resize it** by pinching with both hands and pulling apart or together.
+Limited to between 0.05x and 20x true size.
+
+**The label under the model always says how big it is.** At true size it
+reads the real measurement and the scale, for example
+`100.0 x 100.0 x 100.0 mm` and `1:1, true size`. Once it has been stretched
+it reads the size as drawn and `2.00x true size, tap to reset`.
+
+**Tap that label to go back to true size.** The readout is the reset control,
+so the thing that tells you the model is no longer life sized is the thing
+that fixes it.
+
+Resizing by hand is kept separate from the scale FreeCAD asks for.
+ModelLoader puts the true size correction on an inner wrapper and the hands
+only ever scale the outer root, so resetting to 1 is exact rather than
+approximate, and a model edited in FreeCAD keeps whatever size you stretched
+it to.
+
+## True size, and what guarantees it
+
+A part measures the same through the glasses as it does in FreeCAD. One inch
+in FreeCAD is one inch in front of you, and `tools/test_exporter.py` checks
+exactly that: a 1 inch cube, with FreeCAD set to an imperial schema, comes out
+as 25.4 mm and is drawn 25.4 mm across.
+
+It holds because nothing trusts the units in the file. FreeCAD reports the
+true bounding box in millimetres, the lens measures the mesh it actually
+received, and the ratio between them is the correction. An exporter writing
+metres, millimetres or anything else still lands at the right size.
 
 ## bridgeUrl
 

@@ -43,10 +43,11 @@ import urllib.request
 CONFIG = os.path.join(os.path.expanduser("~"), ".claude.json")
 OBJECT_NAME = "HoloCAD"
 STATUS_OBJECT = "HoloCAD Status"
+PROMPT_OBJECT = "HoloCAD Prompt"
 MATERIAL_NAME = "HoloCAD Model Material"
 LINE_MATERIAL_NAME = "HoloCAD Wireframe Material"
 SCRIPTS = ["BridgeClient", "ModelLoader", "ModelPlacement", "DimensionOverlay",
-           "StatusPanel"]
+           "StatusPanel", "TunnelPairing"]
 MODULES = [
     ("InternetModule", "Internet Module", "internetModule"),
     ("RemoteMediaModule", "Remote Media Module", "remoteMediaModule"),
@@ -157,15 +158,15 @@ def find_camera_object():
     return found[0] if found else None
 
 
-def ensure_status_text():
-    """A head locked Text showing the pairing code and connection state.
+def ensure_text(name, height, size=48):
+    """A head locked Text, so what it says cannot be looked away from.
 
-    Parented to the camera so it stays in view: a code the user has to read
-    and type is useless if they have to go looking for it.
+    Parented to the camera on purpose: a prompt asking the wearer to type
+    something is useless if they have to go hunting for it.
     """
     print("")
-    print("status panel:")
-    existing = tool("GetLensStudioSceneObjectByName", {"name": STATUS_OBJECT})
+    print("{0}:".format(name))
+    existing = tool("GetLensStudioSceneObjectByName", {"name": name})
     if existing.get("objects"):
         holder = existing["objects"][0]
         oid = holder.get("id") or holder.get("objectUUID")
@@ -176,12 +177,12 @@ def ensure_status_text():
             print("  FAIL no camera in the scene, cannot place the panel")
             return None
         created = tool("CreateLensStudioSceneObject",
-                       {"name": STATUS_OBJECT, "parentUUID": camera})
+                       {"name": name, "parentUUID": camera})
         oid = created["objectUUID"]
         print("  created {0} under the camera".format(oid))
         # In front of the viewer and a little low. The camera looks along
         # its own negative Z, so forward is a negative z here.
-        for axis, value in (("x", 0.0), ("y", -8.0), ("z", -60.0)):
+        for axis, value in (("x", 0.0), ("y", height), ("z", -60.0)):
             set_prop(oid, "localTransform.position." + axis, value, "number")
 
     obj = tool("GetLensStudioSceneObjectById", {"objectUUID": oid})["object"]
@@ -198,7 +199,7 @@ def ensure_status_text():
         return None
     print("  added a Text component {0}".format(text_id))
     set_prop(text_id, "text", "Holo-CAD starting", "string")
-    set_prop(text_id, "size", 48, "number")
+    set_prop(text_id, "size", size, "number")
     return text_id
 
 
@@ -333,12 +334,17 @@ def main() -> int:
     if line_mat:
         print("  DimensionOverlay")
         set_prop(comps["DimensionOverlay"], "lineMaterial", line_mat, "reference")
+    print("  ModelPlacement")
+    set_prop(comps["ModelPlacement"], "allowResize", True, "boolean")
 
-    # A visible status panel. Without one the pairing code has nowhere to
-    # appear, and a relay pairing cannot be completed at all.
-    text_id = ensure_status_text()
-    if text_id:
-        set_prop(comps["StatusPanel"], "statusText", text_id, "reference")
+    # Two head locked labels. Without them the tunnel words have nowhere to
+    # be asked for, and pairing cannot be completed at all.
+    prompt_id = ensure_text(PROMPT_OBJECT, 6.0, 56)
+    if prompt_id:
+        set_prop(comps["TunnelPairing"], "promptText", prompt_id, "reference")
+    status_id = ensure_text(STATUS_OBJECT, -8.0, 44)
+    if status_id:
+        set_prop(comps["StatusPanel"], "statusText", status_id, "reference")
 
     obj = tool("GetLensStudioSceneObjectById", {"objectUUID": oid})["object"]
     print("")

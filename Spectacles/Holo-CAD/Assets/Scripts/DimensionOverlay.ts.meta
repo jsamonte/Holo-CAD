@@ -51,6 +51,6 @@
   InputLines:
     - '// @input SceneObject modelLoaderObject {"hint":"Object holding the ModelLoader. Leave empty to look on this object."}'
     - '// @input Asset.Material lineMaterial {"hint":"Unlit material for the wireframe. Without one the box is skipped."}'
-    - '// @input bool visibleAtStart {"hint":"Show the box as soon as a model arrives."}'
+    - '// @input bool visibleAtStart = true {"hint":"Show the box as soon as a model arrives."}'
     - '// @input float labelSizeCm = 2 {"hint":"Label size in cm. Labels always face you."}'
     - '// @input SceneObject cameraObject {"hint":"Camera the labels turn to face. Leave empty to find the main camera."}'

@@ -57,7 +57,9 @@ $venv = Join-Path $root "bridge\.venv\Scripts\python.exe"
 $suites = @(
     @{ Name = "server";   Exe = $python;     Script = "tools\test_holocad_server.py" },
     @{ Name = "exporter"; Exe = $freecadcmd; Script = "tools\test_exporter.py" },
-    @{ Name = "addon";    Exe = $freecadcmd; Script = "tools\test_addon.py" }
+    @{ Name = "addon";    Exe = $freecadcmd; Script = "tools\test_addon.py" },
+    # Needs cloudflared and the internet, and skips itself passing without them.
+    @{ Name = "tunnel";   Exe = $python;     Script = "tools\test_tunnel.py" }
 )
 if (Test-Path $venv) {
     $suites += @{ Name = "relay"; Exe = $venv; Script = "tools\test_relay.py" }
@@ -73,10 +75,16 @@ foreach ($suite in $suites) {
     Write-Host $suite.Name
     Write-Host ("=" * 60)
     Push-Location $root
+    $errFile = [System.IO.Path]::GetTempFileName()
     try {
-        $output = & $suite.Exe $suite.Script 2>&1 | Out-String
+        # Not "2>&1": PowerShell 5.1 wraps a native command's stderr in error
+        # records and sets $? to false, so a suite that passed while printing
+        # anything to stderr is reported as a failure. FreeCAD prints plenty.
+        $output = & $suite.Exe $suite.Script 2>$errFile | Out-String
+        $stderr = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
     } finally {
         Pop-Location
+        Remove-Item $errFile -ErrorAction SilentlyContinue
     }
     # freecadcmd exits 0 whatever the script returns, so the suites print a
     # final line and that is what decides the result.
@@ -85,6 +93,10 @@ foreach ($suite in $suites) {
     }
     if ($output -notmatch "all checks passed") {
         $failed += $suite.Name
+        if ($stderr) {
+            Write-Host "stderr:"
+            Write-Host ($stderr.Trim() -split "`n" | Select-Object -Last 15)
+        }
     }
     Write-Host ""
 }

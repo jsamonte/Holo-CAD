@@ -18,11 +18,12 @@ import hashlib
 
 import FreeCAD
 
-from . import exporter, holocad_server, relay_client, settings
+from . import exporter, holocad_server, relay_client, settings, tunnel
 from .holocad_server import Bridge
 
 _bridge = None
 _relay = None
+_tunnel = None
 _observer = None
 _timer = None
 _pending = set()
@@ -55,6 +56,45 @@ def relay() -> relay_client.RelayClient:
     target = settings.relay_target()
     _relay.configure(target[0] if target else "", target[1] if target else "")
     return _relay
+
+
+def tunnel_handle() -> tunnel.Tunnel:
+    global _tunnel
+    if _tunnel is None:
+        import os
+
+        # Beside FreeCAD's other user data, so a tunnel started by one
+        # FreeCAD session can be found again by the next one.
+        state = os.path.join(FreeCAD.getUserAppDataDir(), "holocad_tunnel.json")
+        _tunnel = tunnel.Tunnel(log=log, warn=warn, on_ready=_tunnel_ready,
+                                state_path=state)
+    return _tunnel
+
+
+def _tunnel_ready(public_base: str) -> None:
+    """Point the server's model urls at the tunnel once it has a hostname."""
+    bridge().public_base = public_base
+    log("the glasses can now reach this machine at {0}".format(
+        bridge().socket_url()))
+
+
+def start_tunnel() -> bool:
+    """Expose the local server over https, so a published lens can reach it."""
+    server = bridge()
+    if not server.running:
+        start_server()
+    return tunnel_handle().start(server.port)
+
+
+def stop_tunnel() -> None:
+    if _tunnel is not None:
+        _tunnel.stop()
+    bridge().public_base = ""
+
+
+def tunnel_words() -> str:
+    """The part of the tunnel hostname a person types into the lens."""
+    return tunnel_handle().words if _tunnel is not None else ""
 
 
 def bridge() -> Bridge:
@@ -320,6 +360,11 @@ def set_live(enabled: bool) -> bool:
 def shutdown() -> None:
     """Called when FreeCAD closes, so no observer or socket is left behind."""
     set_live(False)
+    # Deliberately not stop_tunnel(): the hostname is what keeps the words
+    # already typed into the lens valid, so closing FreeCAD leaves the
+    # tunnel up and the next session adopts it. The toolbar button ends it.
+    if _tunnel is not None:
+        _tunnel.detach()
     stop_server()
     if _relay is not None:
         _relay.stop()

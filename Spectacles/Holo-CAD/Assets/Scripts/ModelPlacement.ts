@@ -17,10 +17,20 @@
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation"
 
+import {Signal} from "./BridgeClient"
 import {ModelLoader, ShownModel} from "./ModelLoader"
 
 const TAG = "HoloCAD ModelPlacement"
 const GRAB_BOX = "holocad_grab_box"
+
+/** How big a model is right now, relative to the size FreeCAD reported. */
+export type UserScale = {
+  id: string
+  /** 1 means true size. 2 means twice as big as the real part. */
+  factor: number
+  /** Size as currently rendered, in millimetres. */
+  shownMm: vec3
+}
 
 @component
 export class ModelPlacement extends BaseScriptComponent {
@@ -34,15 +44,30 @@ export class ModelPlacement extends BaseScriptComponent {
   allowManipulation: boolean = true
 
   @input
-  @hint("Allow pinch to resize. Off keeps the model at the size FreeCAD says.")
-  freeScale: boolean = false
+  @hint("Two handed pinch to resize. Reset size puts it back to 1:1.")
+  allowResize: boolean = true
 
   @input
   @hint("Padding added to the grab box, in cm, so thin parts stay catchable.")
   grabPaddingCm: number = 2
 
+  @input
+  @hint("Smallest you can shrink to, as a fraction of true size.")
+  minScale: number = 0.05
+
+  @input
+  @hint("Largest you can grow to, as a multiple of true size.")
+  maxScale: number = 20
+
+  /**
+   * Fired while a model is resized by hand, with its id and the multiple of
+   * true size it is now at. 1 means it is at the size FreeCAD says.
+   */
+  readonly onUserScaleChanged = new Signal<UserScale>()
+
   private loader: ModelLoader | null = null
   private wired: Map<string, InteractableManipulation> = new Map()
+  private shown: Map<string, ShownModel> = new Map()
 
   onAwake(): void {
     this.createEvent("OnStartEvent").bind(() => this.start())
@@ -56,11 +81,15 @@ export class ModelPlacement extends BaseScriptComponent {
       return
     }
     this.loader.onModelShown.add((shown) => this.onModelShown(shown))
-    this.loader.onModelRemoved.add((id) => this.wired.delete(id))
+    this.loader.onModelRemoved.add((id) => {
+      this.wired.delete(id)
+      this.shown.delete(id)
+    })
     print(`${TAG}: ready`)
   }
 
   private onModelShown(shown: ShownModel): void {
+    this.shown.set(shown.id, shown)
     if (!this.allowManipulation) {
       return
     }
@@ -85,13 +114,64 @@ export class ModelPlacement extends BaseScriptComponent {
     const manipulation = root.createComponent(InteractableManipulation.getTypeName())
     manipulation.setCanTranslate(true)
     manipulation.setCanRotate(true)
-    manipulation.setCanScale(this.freeScale)
+    manipulation.setCanScale(this.allowResize)
+    manipulation.minimumScaleFactor = this.minScale
+    manipulation.maximumScaleFactor = this.maxScale
+
+    // Report the size while it is being changed, not only at the end, so
+    // the label keeps up with the hands.
+    manipulation.onScaleUpdate.add(() => this.reportScale(shown.id))
+    manipulation.onScaleEnd.add(() => this.reportScale(shown.id))
 
     this.wired.set(shown.id, manipulation)
     print(
-      `${TAG}: ${shown.id} can be grabbed` +
-        (this.freeScale ? " and resized" : ", resizing is off")
+      `${TAG}: ${shown.id} can be grabbed and turned` +
+        (this.allowResize ? ", and resized with two hands" : "")
     )
+  }
+
+  /**
+   * Work out how big the model is now and tell anyone listening.
+   *
+   * The root carries only what the hands have done to it: ModelLoader puts
+   * the true size correction on the wrapper underneath. So the root's own
+   * scale is exactly the multiple of true size, and 1 means the part is the
+   * size FreeCAD says it is.
+   */
+  private reportScale(id: string): void {
+    const shown = this.shown.get(id)
+    if (shown === undefined) {
+      return
+    }
+    const factor = shown.root.getTransform().getLocalScale().x
+    this.onUserScaleChanged.emit({
+      id: id,
+      factor: factor,
+      shownMm: shown.shownMm.uniformScale(factor)
+    })
+  }
+
+  /** Put a model back to the size FreeCAD says it is. */
+  resetSize(id?: string): void {
+    const ids = id !== undefined ? [id] : Array.from(this.shown.keys())
+    for (const each of ids) {
+      const shown = this.shown.get(each)
+      if (shown === undefined) {
+        continue
+      }
+      shown.root.getTransform().setLocalScale(new vec3(1, 1, 1))
+      this.reportScale(each)
+      print(`${TAG}: ${each} back to true size`)
+    }
+  }
+
+  /** How many times true size a model is currently drawn at. */
+  userScale(id: string): number {
+    const shown = this.shown.get(id)
+    if (shown === undefined) {
+      return 1
+    }
+    return shown.root.getTransform().getLocalScale().x
   }
 
   /**
@@ -149,10 +229,10 @@ export class ModelPlacement extends BaseScriptComponent {
     print(`${TAG}: models re-placed in front of you`)
   }
 
-  /** Turn pinch to resize on or off at runtime. */
-  setFreeScale(enabled: boolean): void {
-    this.freeScale = enabled
+  /** Turn two handed resizing on or off at runtime. */
+  setAllowResize(enabled: boolean): void {
+    this.allowResize = enabled
     this.wired.forEach((manipulation) => manipulation.setCanScale(enabled))
-    print(`${TAG}: free scale ${enabled ? "on" : "off"}`)
+    print(`${TAG}: resizing ${enabled ? "on" : "off"}`)
   }
 }

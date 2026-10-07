@@ -4,51 +4,62 @@ Going from the development build, which talks to FreeCAD on your own network,
 to a build in Lens Explorer that anyone can install.
 
 The difference between them is one thing: a published lens may only use
-`wss://` and `https://`, so it cannot reach anybody's laptop directly. It
-talks to the relay instead, and FreeCAD uploads to the same relay.
+`wss://` and `https://`, so it cannot reach a plain local address. FreeCAD's
+own server gets a real certificate by running a cloudflared tunnel in front
+of itself.
 
-What a user ends up doing: install the FreeCAD addon, install the lens from
-Lens Explorer, read the pairing code off the glasses, type it into FreeCAD.
-No Lens Studio, no firewall rule, no address to enter.
+What a user ends up doing: install the FreeCAD addon and cloudflared, install
+the lens from Lens Explorer, press Share over the internet, and type the four
+words FreeCAD shows into the glasses. No Lens Studio, no firewall rule, and
+nobody hosting a server.
 
-## 1. Stand up the relay, once
+## 1. Nothing to host
 
-[docs/RELAY.md](RELAY.md) has the deployment. You need a host, a domain and a
-reverse proxy that obtains the certificate. When `curl https://your-relay/status`
-returns JSON, it is ready.
+The addon runs **cloudflared** itself and FreeCAD's own server ends up behind
+`https://<four-words>.trycloudflare.com` with a certificate the glasses
+already trust. No account, no domain, no server, and no model passing through
+anyone else's machine.
 
-This is a commitment rather than a step. Every model every user sends passes
-through it, and while it is down every published lens is dead.
-
-## 2. Bake the relay into the addon
-
-In `freecad_addon/SpecsLink/specslink/settings.py`:
-
-```python
-DEFAULT_RELAY_URL = "https://your-relay.example.com"
-```
-
-That is the whole change. Relay sending switches itself on, and a user only
-has to type the pairing code rather than the address as well.
-
-## 3. Point the lens at the relay
+Users install cloudflared alongside the addon:
 
 ```powershell
-py tools\wire_lens_scene.py --delete
-py tools\wire_lens_scene.py --relay your-relay.example.com
+winget install Cloudflare.cloudflared
 ```
 
-`bridgeUrl` becomes `wss://your-relay.example.com/lens`. Ctrl+S in Lens
-Studio afterwards, because the MCP server cannot save.
+Then **Share over the internet** on the Holo-CAD toolbar, and the Report view
+prints the four words to type into the lens.
 
-## 4. Project Settings
+The hostname is random, because a quick tunnel needs no account. It survives
+FreeCAD restarting, since the tunnel is deliberately left running and the next
+session adopts it, so the words are typed once per tunnel rather than once per
+session. Stop sharing from the same toolbar button when you are done.
+
+Wanting the words typed once and never again means a **stable** hostname, and
+that needs an account somewhere: Tailscale Funnel is free and needs no domain,
+Cloudflare named tunnels need a domain. Both work through the same setting;
+see `docs/RELAY.md`.
+
+A relay also still exists in `relay/` for the case where you would rather host
+one server for everybody than have each user run a tunnel.
+
+## 2. The lens asks for the words itself
+
+`TunnelPairing` opens the keyboard when it has no hostname stored, accepts
+the words however they are typed (pasted whole url, spaces instead of
+hyphens, suffix included), and remembers them. Nothing to configure.
+
+`bridgeUrl` is then set at runtime to
+`wss://<words>.trycloudflare.com/ws`, so the value left in the inspector only
+matters for a development build on the local network.
+
+## 3. Project Settings
 
 - **Experimental APIs: off.** `lensDescriptors` in the `.esproj` goes back to
-  `[]`. With the relay url in place nothing needs the insecure schemes.
+  `[]`. With the tunnel in place nothing needs the insecure schemes.
 - **Lens Icon** set under Distribution Settings. `py tools\make_lens_icon.py`
   writes a 320 x 320 PNG at `tools/lens_icon.png`.
 
-## 5. Check against Snap's list
+## 4. Check against Snap's list
 
 Snap reviews every Spectacles lens before it reaches Lens Explorer, usually
 two to three business days.
@@ -65,24 +76,23 @@ two to three business days.
 Bump `LENS_VERSION` on every build you submit. It is what makes a bug report
 from a stranger worth anything.
 
-## 6. Test the published path before submitting
+## 5. Test the published path before submitting
 
 Worth doing with Experimental APIs already off, because that is the build
 being reviewed.
 
-1. Start the relay.
+1. In FreeCAD, press **Share over the internet** and wait for the words.
 2. Send the lens to your own glasses from Lens Studio.
-3. The status panel shows a pairing code.
-4. In FreeCAD, Settings, Relay: type the code. The address is already filled
-   in from step 2.
-5. Press Send to Spectacles. The model should appear.
+3. The lens asks for the words. Type them, without the suffix.
+4. Press **Send to Spectacles**. The model should appear.
 
-If it does not, `docs/RELAY.md` has the failure table. The usual causes are a
-mistyped code and a proxy that is not passing WebSocket upgrades through.
+If it does not, the Report view in FreeCAD and the Logger in Lens Studio
+between them say why. The usual causes are a word typed wrong and cloudflared
+not being installed.
 
 ## What stays available afterwards
 
-The addon keeps serving locally at the same time, so a development lens on the
-same Wi-Fi still works while the published one goes through the relay. The two
-builds differ only in `bridgeUrl` and the Experimental APIs checkbox, and
-`wire_lens_scene.py` switches between them in one command.
+The addon serves on the local network at the same time, so a development lens
+on the same Wi-Fi keeps working while a published one comes in through the
+tunnel. The two builds differ only in the Experimental APIs checkbox and where
+`bridgeUrl` points, and `wire_lens_scene.py` switches between them.

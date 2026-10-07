@@ -204,6 +204,11 @@ class Bridge:
 
     def __init__(self, port=DEFAULT_PORT, log=None):
         self.port = port
+        # Where the glasses should reach this server, which is not where it
+        # listens once a tunnel is in front of it. A published lens can use
+        # neither http nor ws, so the tunnel's https base goes here and every
+        # model url is built from it.
+        self.public_base = ""
         self.store = ModelStore()
         self.peers = set()
         self._peers_lock = threading.Lock()
@@ -253,10 +258,15 @@ class Bridge:
     # ---- urls ----
 
     def base_url(self) -> str:
+        if self.public_base:
+            return self.public_base
         return "http://{0}:{1}".format(self.host_ip, self.port)
 
     def socket_url(self) -> str:
-        return "ws://{0}:{1}/ws".format(self.host_ip, self.port)
+        base = self.base_url()
+        if base.startswith("https://"):
+            return "wss://" + base[len("https://"):] + "/ws"
+        return "ws://" + base[len("http://"):] + "/ws"
 
     def model_url(self, model_id: str, version: int) -> str:
         return "{0}/models/{1}/{2}.glb".format(self.base_url(), model_id, version)

@@ -79,6 +79,39 @@ class ToggleLiveMode(object):
                 service.warn(str(e))
 
 
+class ShareOverInternet(object):
+    """Put a cloudflared tunnel in front of the server, and show the words.
+
+    This is what a published lens needs. It may only use wss and https, so
+    it cannot reach a plain local address, and the tunnel supplies a real
+    certificate on a public hostname without anyone buying a domain or
+    hosting a server.
+    """
+
+    def GetResources(self):
+        return {
+            "Pixmap": _icon("tunnel.svg"),
+            "MenuText": "Share over the internet",
+            "ToolTip": (
+                "Open a secure tunnel so a published lens can reach this "
+                "machine. Needs cloudflared installed. The Report view shows "
+                "the words to type into the lens."
+            ),
+            "Checkable": True,
+        }
+
+    def IsActive(self):
+        return True
+
+    def Activated(self, index=None):
+        if service.tunnel_handle().running:
+            service.stop_tunnel()
+            return
+        if not service.start_tunnel():
+            return
+        service.log("waiting for the tunnel to come up, a few seconds")
+
+
 class ShowSettings(object):
     """Port, scale and mesh quality, plus the url to paste into the lens."""
 
@@ -325,6 +358,7 @@ SettingsDialog = _LazyDialog()
 COMMANDS = (
     ("SpecsLink_Send", SendToSpectacles),
     ("SpecsLink_Live", ToggleLiveMode),
+    ("SpecsLink_Share", ShareOverInternet),
     ("SpecsLink_Settings", ShowSettings),
 )
 

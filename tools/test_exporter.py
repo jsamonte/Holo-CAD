@@ -106,6 +106,30 @@ def main() -> int:
     check("would render at 100 mm", all(close(v, 100.0, 1e-4) for v in shown_mm),
           str(shown_mm))
 
+    print("one inch in FreeCAD is one inch on the glasses")
+    # FreeCAD works in millimetres internally whatever the display units
+    # are, and the lens is told millimetres. If anything ever read the
+    # display schema instead, an imperial user would be out by 25.4x.
+    FreeCAD.Units.setSchema(3)  # Imperial decimal
+    inch = doc.addObject("Part::Box", "OneInch")
+    inch.Length = FreeCAD.Units.Quantity("1 in")
+    inch.Width = FreeCAD.Units.Quantity("1 in")
+    inch.Height = FreeCAD.Units.Quantity("1 in")
+    doc.recompute()
+    result = exporter.export([inch])
+    check("a 1 inch cube reports 25.4 mm",
+          all(close(v, 25.4, 1e-6) for v in result["bbox_mm"]),
+          str(result["bbox_mm"]))
+    gltf, _ = read_glb(result["glb"])
+    extent = measured_extent(gltf)
+    correction = max(result["bbox_mm"]) / 10.0 / max(extent)
+    shown_mm = max(extent) * correction * 10
+    check("and the lens would draw it 25.4 mm across",
+          close(shown_mm, 25.4, 1e-4), str(shown_mm))
+    check("which is one inch", close(shown_mm / 25.4, 1.0, 1e-6),
+          str(shown_mm / 25.4))
+    FreeCAD.Units.setSchema(0)  # back to the standard schema
+
     print("a part that is not a cube, to catch an axis swap")
     slab = doc.addObject("Part::Box", "Slab")
     slab.Length, slab.Width, slab.Height = 120.0, 40.0, 15.0

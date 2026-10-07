@@ -11,7 +11,10 @@
  * label still says what the part really measures.
  */
 
+import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
+
 import {ModelLoader, ShownModel} from "./ModelLoader"
+import {ModelPlacement, UserScale} from "./ModelPlacement"
 
 const TAG = "HoloCAD DimensionOverlay"
 const OVERLAY = "holocad_dimensions"
@@ -37,7 +40,7 @@ export class DimensionOverlay extends BaseScriptComponent {
 
   @input
   @hint("Show the box as soon as a model arrives.")
-  visibleAtStart: boolean = false
+  visibleAtStart: boolean = true
 
   @input
   @hint("Label size in cm. Labels always face you.")
@@ -49,9 +52,12 @@ export class DimensionOverlay extends BaseScriptComponent {
   cameraObject!: SceneObject
 
   private loader: ModelLoader | null = null
+  private placement: ModelPlacement | null = null
   private camera: SceneObject | null = null
   private shown: Map<string, ShownModel> = new Map()
   private overlays: Map<string, SceneObject> = new Map()
+  private scaleLabels: Map<string, Text> = new Map()
+  private userScales: Map<string, number> = new Map()
   private visible: boolean = false
 
   onAwake(): void {
@@ -69,6 +75,13 @@ export class DimensionOverlay extends BaseScriptComponent {
     }
     this.loader.onModelShown.add((model) => this.onModelShown(model))
     this.loader.onModelRemoved.add((id) => this.forget(id))
+
+    // Resizing by hand has to show up in the numbers, or the overlay is
+    // lying about the part the moment anyone stretches it.
+    this.placement = host.getComponent(ModelPlacement.getTypeName())
+    if (this.placement !== null) {
+      this.placement.onUserScaleChanged.add((scale) => this.onUserScale(scale))
+    }
     print(`${TAG}: ready, overlay ${this.visible ? "on" : "off"}`)
   }
 
@@ -93,6 +106,37 @@ export class DimensionOverlay extends BaseScriptComponent {
   private forget(id: string): void {
     this.shown.delete(id)
     this.overlays.delete(id)
+    this.scaleLabels.delete(id)
+    this.userScales.delete(id)
+  }
+
+  /**
+   * Keep the numbers honest while two hands stretch the model.
+   *
+   * Only the label changes, not the wireframe: the box is a child of the
+   * root being scaled, so it grows with the part on its own.
+   */
+  private onUserScale(scale: UserScale): void {
+    this.userScales.set(scale.id, scale.factor)
+    const label = this.scaleLabels.get(scale.id)
+    if (label === null || label === undefined) {
+      return
+    }
+    label.text = this.scaleText(scale.id, scale.shownMm)
+  }
+
+  /** What the label under the model says about its size right now. */
+  private scaleText(id: string, shownMm: vec3): string {
+    const factor = this.userScales.get(id) ?? 1
+    const size = `${shownMm.x.toFixed(1)} x ${shownMm.y.toFixed(1)} x ${shownMm.z.toFixed(1)} mm`
+    if (Math.abs(factor - 1) < 0.005) {
+      const model = this.shown.get(id)
+      const ratio = model !== undefined ? model.ratioLabel : "1:1"
+      return `${size}
+${ratio}, true size`
+    }
+    return `${size}
+${factor.toFixed(2)}x true size, tap to reset`
   }
 
   private onModelShown(model: ShownModel): void {
@@ -192,11 +236,50 @@ export class DimensionOverlay extends BaseScriptComponent {
                new vec3(w / 2 + this.labelSizeCm, h / 2, d / 2))
     this.label(root, `${mm.z.toFixed(1)} mm`,
                new vec3(w / 2 + this.labelSizeCm, 0, 0))
-    this.label(root, model.ratioLabel,
-               new vec3(0, h + this.labelSizeCm * 1.5, 0))
+    // The size readout doubles as the way back to true size, so the thing
+    // that tells you something is wrong is the thing that fixes it.
+    const scaleLabel = this.label(
+      root,
+      this.scaleText(model.id, model.shownMm.uniformScale(
+        this.userScales.get(model.id) ?? 1)),
+      new vec3(0, h + this.labelSizeCm * 1.5, 0)
+    )
+    if (scaleLabel !== null) {
+      this.scaleLabels.set(model.id, scaleLabel)
+      this.makeResettable(scaleLabel.getSceneObject(), model.id, w)
+    }
   }
 
-  private label(parent: SceneObject, text: string, position: vec3): void {
+  /**
+   * Make the size label tappable, so resizing by hand is always undoable.
+   *
+   * SIK looks for colliders among an Interactable's descendants, and a Text
+   * has none, so one is added to match roughly what the label covers.
+   */
+  private makeResettable(object: SceneObject, id: string, widthCm: number): void {
+    if (this.placement === null) {
+      return
+    }
+    const collider = object.createComponent("Physics.ColliderComponent")
+    collider.debugDrawEnabled = false
+    collider.intangible = true
+    const box = Shape.createBoxShape()
+    box.size = new vec3(
+      Math.max(widthCm, this.labelSizeCm * 8),
+      this.labelSizeCm * 2.4,
+      this.labelSizeCm * 0.5
+    )
+    collider.shape = box
+
+    const interactable = object.createComponent(Interactable.getTypeName())
+    interactable.onTriggerEnd.add(() => {
+      if (this.placement !== null) {
+        this.placement.resetSize(id)
+      }
+    })
+  }
+
+  private label(parent: SceneObject, text: string, position: vec3): Text | null {
     const object = global.scene.createSceneObject("holocad_label")
     object.setParent(parent)
     object.getTransform().setLocalPosition(position)
@@ -218,6 +301,7 @@ export class DimensionOverlay extends BaseScriptComponent {
       billboard.lookAtMode = LookAtComponent.LookAtMode.LookAtPoint
       billboard.worldUpVector = LookAtComponent.WorldUpVector.SceneY
     }
+    return label
   }
 
   private resolveCamera(): SceneObject | null {
