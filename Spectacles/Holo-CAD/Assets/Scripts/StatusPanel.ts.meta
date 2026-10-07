@@ -1,0 +1,47 @@
+- !<AssetImportMetadata/ed93885b-ecc7-488e-a55c-db23dc63ec74>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> e8bbddfb-848d-458e-80f4-fa197c7e59a4
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> e8bbddfb-848d-458e-80f4-fa197c7e59a4
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 27afec82-297d-49f3-b320-40703d5dcf88
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/27afec82-297d-49f3-b320-40703d5dcf88>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: cd3682bd-dce1-4e48-a223-2dae1cfef51e
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    sourceObject: false
+    statusText: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      sourceObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Component.Text statusText {"hint":"Text component to write the status into."}'
+    - '// @input SceneObject sourceObject {"hint":"Object holding BridgeClient and ModelLoader. Leave empty to look on this object."}'

@@ -1,151 +1,128 @@
-# Lens setup, by hand in Lens Studio
+# Lens setup
 
-Everything here happens in the Lens Studio editor. Lens Studio 5.15.4, project
-at `C:\GitHub\Holo-CAD\Spectacles\Holo-CAD`.
+The lens project is `Spectacles/Holo-CAD`, built from the **Spectacles**
+template in Lens Studio 5.15.4. Most of this is already done and committed;
+the list is here so it can be rebuilt or checked.
 
-Steps marked **(by hand)** cannot be driven from outside the editor. Steps
-marked **(automated)** can be done through the Lens Studio MCP server, so ask
-rather than clicking.
+Steps marked **(by hand)** can only be done in the editor. The rest
+`tools/wire_lens_scene.py` does over the Lens Studio MCP server.
 
-## 0. The project must target Spectacles (by hand)
+## The short version
 
-The project as it stands was created from the **Default** template, not the
-Spectacles one. Its `.esproj` says:
-
-```
-lensClientCompatibilities:
-  - Mobile
-  - Web
-fromTemplateName: Default
+```powershell
+py tools\wire_lens_scene.py --delete      # if a HoloCAD object already exists
+py tools\wire_lens_scene.py
 ```
 
-A Spectacles project says:
+Then in Lens Studio: **Ctrl+S**, check **Experimental APIs** is on, and send to
+the glasses. The scene edits live only in the editor until you save, because
+the MCP server has no save tool.
+
+## What the scene needs
+
+One object named `HoloCAD` at the scene root, carrying five script
+components. They find each other with `getComponent(X.getTypeName())` on their
+own object, which is how SIK does it, so they have to sit together.
+
+| Component | Does | Inputs that matter |
+| --------- | ---- | ------------------ |
+| `BridgeClient` | WebSocket to FreeCAD, reconnects on its own | `bridgeUrl`, `internetModule` |
+| `ModelLoader` | downloads each GLB, measures it, scales it to true size | `material`, `internetModule`, `remoteMediaModule` |
+| `ModelPlacement` | grab, move and turn. Resizing stays off | `freeScale` |
+| `DimensionOverlay` | wireframe box with the size in mm | `lineMaterial` |
+| `StatusPanel` | connection and model state, optional | `statusText` |
+
+Plus three assets in `Assets/`: an **Internet Module**, a **Remote Media
+Module**, and two materials (PBR for imported meshes, Unlit for the
+wireframe).
+
+## The module assets are not optional
+
+`require("LensStudio:InternetModule")` does **not** resolve on 5.15. Measured:
+the build logs
 
 ```
-lensClientCompatibilities:
-  - Spectacles
-fromTemplateName: Spectacles
+Failed to resolve dependency InternetModule in asset Assets/Scripts/BridgeClient.ts
 ```
 
-and ships `SpectaclesInteractionKit.lspkg` and `SpectaclesUIKit.lspkg` in
-`Packages/`, which phase 3 needs for grab and move.
+whether or not the assets exist. The error is survivable, the scripts still
+run, but the require yields nothing, so a component with those inputs left
+empty reports `no InternetModule, nothing can be downloaded` and stops. **Wire
+the inputs.** The assets have to exist for the inputs to point at.
 
-So before pushing anything to the glasses: in the Lens Studio home screen,
-create a new project from the **Spectacles** template and save it over
-`C:\GitHub\Holo-CAD\Spectacles\Holo-CAD`. Nothing is lost, the current project
-holds only the stock template scene. Then copy `Assets/Scripts` across if the
-new project does not already contain it.
+Two things make this hard to spot. Those errors go to the Lens Studio log file
+under `%LOCALAPPDATA%\Snap\Lens Studio\logs`, never the Logger panel. And the
+MCP cannot create module assets, since its asset types are only RenderTarget,
+ObjectPrefab, Material, FileTexture, FileAudioTrack and AnimatedTexture.
+Writing the two files straight into `Assets/` does work, and Lens Studio
+imports them and assigns its own ids, which is what the wiring tool relies on.
 
-## 1. The scripts
+## bridgeUrl
 
-Three files, already in `Assets/Scripts`, already compiling:
+The address FreeCAD prints in its Report view when the server starts, for
+example `ws://192.168.1.56:8765/ws`. **Never `127.0.0.1`**: the glasses are a
+separate device. It changes when the laptop changes network, so read it off
+the Report view rather than trusting an old value.
 
-| File | Does |
-| ---- | ---- |
-| `BridgeClient.ts` | WebSocket to the bridge, parses `model_update`, reconnects with backoff |
-| `ModelLoader.ts` | downloads each GLB, measures it, scales it to true size, swaps it in |
-| `StatusPanel.ts` | optional, writes connection and model state into a Text |
+## Project Settings (by hand)
 
-Lens Studio imports `.ts` files from `Assets/` automatically and generates the
-`.ts.meta` beside them. If the components do not appear in the Add Component
-list, click into the Lens Studio window to let it pick up the folder.
-
-## 2. One scene object holds all three (automated)
-
-The components find each other with `getComponent(BridgeClient.getTypeName())`
-on their own scene object, so they must sit together.
-
-1. Create a scene object at the scene root, named `HoloCAD`.
-2. Add component > Script > `BridgeClient`.
-3. Add component > Script > `ModelLoader`.
-4. Add component > Script > `StatusPanel` (optional).
-
-Models are spawned as children of whatever object holds `ModelLoader`, unless
-`modelsParent` is set.
-
-## 3. Inputs to fill in
-
-### BridgeClient
-
-| Input | Value |
-| ----- | ----- |
-| `bridgeUrl` | the `ws://...` line the bridge prints, for example `ws://172.16.9.63:8765/ws`. **Never `127.0.0.1`**, the glasses are a separate device |
-| `internetModule` | leave empty, the module is obtained in code |
-| `verbose` | on while testing, it logs every message |
-| `pingSeconds` | 15 is fine |
-
-### ModelLoader
-
-| Input | Value |
-| ----- | ----- |
-| `material` | **required.** A PBR material asset. Create one in the Asset Browser (+ > Material > PBR) and drop it here. Imported glTF meshes need a material as a template |
-| `internetModule`, `remoteMediaModule` | leave empty |
-| `bridgeClientObject` | leave empty when BridgeClient is on the same object |
-| `modelsParent` | leave empty to parent models under this object |
-| `cameraObject` | leave empty to find the main camera |
-| `spawnDistanceCm` | 50 |
-| `spawnDropCm` | 15 |
-| `axisTolerance` | 0.01, which is the 1 percent the spec asks for |
-
-### StatusPanel
-
-| Input | Value |
-| ----- | ----- |
-| `statusText` | optional Text component. Without it the status only goes to the Logger |
-| `sourceObject` | leave empty when all three are on one object |
-
-## 4. Project Settings (by hand)
-
-- **Experimental APIs: on.** Plain `ws://` and `http://` both need it. Without
-  it the socket fails to open and `makeResourceFromUrl` refuses the url.
-- **Internet access**, if your Project Settings shows an extended permission or
-  capability for it, on.
-
-Consequence worth knowing: a lens with Experimental APIs on cannot be
-published. That is accepted for now. `SPEC.md` has the tunnel plan for later.
-
-## 5. Push to the glasses (by hand)
-
-Send to the Spectacles the usual way, with the glasses awake and paired.
-
-## 6. Test
-
-1. Start the bridge on the laptop:
-   `cd C:\GitHub\Holo-CAD\bridge; .\.venv\Scripts\python.exe server.py`
-2. Read the `ws://` line off its banner, check it matches `bridgeUrl`.
-3. Open the lens on the glasses. The bridge should print
-   `lens connected from 172.16.x.x (1 total)`.
-4. Push the cube: `.\.venv\Scripts\python.exe push_test_cube.py`
-5. A blue 100 mm cube should appear about 50 cm in front of you, slightly below
-   eye level, sitting on nothing in particular.
-6. Hold a ruler up to it. Each edge should measure 100 mm.
-
-The Logger line that proves the scale maths, for the test cube:
+**Experimental APIs: on.** Plain `ws://` and `http://` both need it, and the
+engine says so plainly when it is off:
 
 ```
-HoloCAD ModelLoader: test_cube v1 shown at 1:1  size 100.0 x 100.0 x 100.0 mm  (true 100.0 x 100.0 x 100.0 mm)  correction 100.0000  meshes 1  load 412 ms
+InternalError: URL is not secure (Experimental API must be enabled to access insecure URLs)
 ```
 
-`correction 100` is expected and is the point of the exercise. The file holds a
-cube 0.1 units per side because glTF says metres, Lens Studio works in
-centimetres, so the measured 0.1 has to become 10. If the exporter ever starts
-writing millimetres instead, the correction becomes 0.1 and the cube still
-measures 100 mm.
+This also means the lens cannot be published to Lens Explorer, which is a
+deliberate trade. The README explains why, and `lensDescriptors` in the
+`.esproj` is the giveaway: `- EXPERIMENTAL_API` present means testing mode,
+empty `[]` means publishable.
+
+## Test
+
+1. Start the server. In FreeCAD, switch to the **Holo-CAD** workbench, which
+   starts it, or run it directly:
+   `& "C:\Program Files\FreeCAD 1.1\bin\python.exe" freecad_addon\SpecsLink\specslink\holocad_server.py`
+2. Check the url it prints matches `bridgeUrl`.
+3. Open the lens. The server should log
+   `lens connected from 192.168.1.x (1 total)`.
+4. Send something: the toolbar button in FreeCAD, or without FreeCAD,
+   `cd bridge; .\.venv\Scripts\python.exe push_test_cube.py`.
+5. A cube appears about 50 cm in front of you, slightly below eye level.
+6. Hold a ruler to it. Each edge measures 100 mm.
+
+The line that proves the arithmetic:
+
+```
+HoloCAD ModelLoader: test_cube v12 shown at 1:1  size 100.0 x 100.0 x 100.0 mm  (true 100.0 x 100.0 x 100.0 mm)  correction 100.0000  meshes 1  load 303 ms
+```
+
+`correction 100` is expected. The file holds a cube 0.1 units per side because
+glTF says metres and Lens Studio works in centimetres, so the measured 0.1 has
+to become 10. If the exporter ever starts writing millimetres instead, the
+correction becomes 0.1 and the cube still measures 100 mm. That is the point:
+nothing trusts the units in the file.
 
 ## When nothing appears
 
-Work down this list, it is ordered by how often each one is the cause.
+Ordered by how often each one is the cause.
 
-| Symptom in the Logger | Cause |
-| --------------------- | ----- |
-| `connecting` then `closed (code ...)` repeatedly | the laptop is not reachable. Windows Firewall or Wi-Fi client isolation, see README |
-| `createWebSocket rejected` | Experimental APIs is off, or `bridgeUrl` is malformed |
-| nothing at all from BridgeClient | the component is not on an enabled scene object, or the lens on the glasses is an older build |
-| `download failed for http://...` | the WebSocket got through but the HTTP fetch did not. Same firewall question, on the same port |
-| `the material input is empty` | step 3, ModelLoader needs a PBR material |
-| `no BridgeClient found` | the two components are on different scene objects |
+| Symptom | Cause |
+| ------- | ----- |
+| `URL is not secure (Experimental API must be enabled...)` | Experimental APIs is off |
+| `connecting` then `closed (code ...)` on repeat | the laptop is not reachable: Windows Firewall or Wi-Fi client isolation, see the README |
+| `no InternetModule, nothing can be downloaded` | the `internetModule` input is empty, see above |
+| `the material input is empty` | ModelLoader needs a PBR material |
+| `no BridgeClient found` | the components are on different scene objects |
+| nothing at all in the Logger | check the Lens Studio **log file**, not just the Logger. Script conversion errors only appear there |
+| `download failed for http://...` | the socket got through but the HTTP fetch did not. Same firewall question, same port |
 | `contains no mesh visuals` | the GLB loaded but held no geometry, so look at the exporter |
-| `WARNING ... proportions disagree with bbox_mm` | the file and FreeCAD's bounding box describe different shapes. The largest axis is still correct, but the export dropped or moved something |
+| `WARNING ... proportions disagree with bbox_mm` | the file and FreeCAD's bounding box describe different shapes. The largest axis is still right, but something in the export was dropped or moved |
 
-The bridge's own terminal is the other half of the picture: it logs every lens
-connect, every push, and every GLB it serves.
+## Rebuilding the lens project from scratch
+
+If the project ever has to be recreated, it must come from the **Spectacles**
+template. A Default template project says `lensClientCompatibilities: Mobile,
+Web`, carries no packages, and cannot be pushed to the glasses at all.
+Recreating also wipes `Assets/Scripts`, so restore the five `.ts` files from
+git afterwards, then run the wiring tool.

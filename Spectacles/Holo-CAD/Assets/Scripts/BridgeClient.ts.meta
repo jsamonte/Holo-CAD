@@ -1,0 +1,53 @@
+- !<AssetImportMetadata/149fb74e-e920-48ab-8f84-c742b1b30488>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 34b49d7c-5f20-4a49-b9ff-30114ec33638
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 34b49d7c-5f20-4a49-b9ff-30114ec33638
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 4b4a27a2-acc6-4221-ab14-f83c5e01db3e
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/4b4a27a2-acc6-4221-ab14-f83c5e01db3e>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 3c392979-bdf6-416b-9cb4-bd981efff49a
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    bridgeUrl: false
+    internetModule: false
+    pingSeconds: false
+    verbose: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - bridgeUrl: "ws://192.168.1.50:8765/ws"
+      internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
+      verbose: false
+      pingSeconds: !<float> 15.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input string bridgeUrl = "ws://192.168.1.50:8765/ws" {"hint":"ws://<laptop LAN ip>:8765/ws  The bridge prints this when it starts. Not 127.0.0.1."}'
+    - '// @input Asset.InternetModule internetModule {"hint":"Required. Drop the project Internet Module asset here. The require fallback does not resolve."}'
+    - '// @input bool verbose {"hint":"Print every message to the Logger."}'
+    - '// @input float pingSeconds = 15 {"hint":"Seconds between keepalive pings. 0 turns them off."}'

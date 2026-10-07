@@ -220,3 +220,6 @@ __marimo__/
 # Holo-CAD
 # Pushed models are runtime artifacts. bridge/test_cube.glb is tracked on purpose.
 bridge/models/
+
+# python cache inside the addon
+freecad_addon/**/__pycache__/

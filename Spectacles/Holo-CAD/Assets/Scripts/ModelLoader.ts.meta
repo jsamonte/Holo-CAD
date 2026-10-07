@@ -1,0 +1,68 @@
+- !<AssetImportMetadata/8e37ee4b-e5b8-42ca-9984-2918f21b70e5>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 74704b0a-30f9-4f82-9056-c10b6fdbcb79
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 74704b0a-30f9-4f82-9056-c10b6fdbcb79
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 919e77c1-152d-4a2e-8d21-eb09a70443d4
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/919e77c1-152d-4a2e-8d21-eb09a70443d4>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: a3b2ccb2-ca5a-47b9-969d-0d2499211e71
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    axisTolerance: false
+    bridgeClientObject: false
+    cameraObject: false
+    internetModule: false
+    material: false
+    modelsParent: false
+    remoteMediaModule: false
+    spawnDistanceCm: false
+    spawnDropCm: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - internetModule: !<reference.InternetModule> 00000000-0000-0000-0000-000000000000
+      remoteMediaModule: !<reference.RemoteMediaModule> 00000000-0000-0000-0000-000000000000
+      material: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      modelsParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnDistanceCm: !<float> 50.000000
+      spawnDropCm: !<float> 15.000000
+      axisTolerance: 0.010000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.InternetModule internetModule {"hint":"Required. Drop the project Internet Module asset here. The require fallback does not resolve."}'
+    - '// @input Asset.RemoteMediaModule remoteMediaModule {"hint":"Required. Drop the project Remote Media Module asset here. The require fallback does not resolve."}'
+    - '// @input Asset.Material material {"hint":"PBR material used as the template for every imported mesh. Required."}'
+    - '// @input SceneObject bridgeClientObject {"hint":"Object holding the BridgeClient. Leave empty to look on this object."}'
+    - '// @input SceneObject modelsParent {"hint":"Parent for loaded models. Leave empty to use this object."}'
+    - '// @input SceneObject cameraObject {"hint":"Camera used for the first placement. Leave empty to find the main camera."}'
+    - '// @input float spawnDistanceCm = 50 {"hint":"How far in front of you a model first appears, in cm."}'
+    - '// @input float spawnDropCm = 15 {"hint":"How far below eye level a model first appears, in cm."}'
+    - '// @input float axisTolerance = 0.01 {"hint":"Warn when the loaded proportions disagree with bbox_mm by more than this fraction."}'

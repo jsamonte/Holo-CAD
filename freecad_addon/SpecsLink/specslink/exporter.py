@@ -1,0 +1,362 @@
+"""Turn FreeCAD objects into a GLB, and measure their true size.
+
+Two exporters, as SPEC.md calls for:
+
+  stock      ImportGui.export(objs, path). FreeCAD registers .glb against
+             ImportGui, which only exists when the GUI is loaded, so this
+             path cannot run under freecadcmd at all. It has also had
+             long standing trouble with placements inside Links and
+             App::Part, and with mirrored objects.
+
+  fallback   tessellate each globally placed shape with
+             MeshPart.meshFromShape and write the GLB here with struct.
+             No GUI, no dependencies, and placements are applied by hand so
+             the Link and App::Part cases cannot go wrong.
+
+The fallback is the default, because it is the one that can be tested and the
+one whose failure modes are known. Set prefer_stock to try the other first.
+
+Units are the thing to be careful about. FreeCAD is millimetres and Z up,
+glTF is metres and Y up. The conversion happens once, in to_gltf_space.
+The lens measures what it receives and corrects anyway, so a mistake here
+shows up as a model lying on its side rather than one at the wrong size.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import struct
+import tempfile
+
+import FreeCAD
+
+COMPONENT_FLOAT = 5126
+COMPONENT_UINT = 5125
+TARGET_ARRAY_BUFFER = 34962
+TARGET_ELEMENT_ARRAY_BUFFER = 34963
+
+# LinearDeflection in mm, AngularDeflection in radians. Smaller is finer.
+QUALITY = {
+    "draft": (0.50, 0.70),
+    "normal": (0.10, 0.50),
+    "fine": (0.02, 0.30),
+}
+DEFAULT_QUALITY = "normal"
+DEFAULT_COLOUR = (0.78, 0.80, 0.84, 1.0)
+
+
+class ExportError(Exception):
+    pass
+
+
+# ---------------------------------------------------------------- selection
+
+
+def has_shape(obj) -> bool:
+    shape = getattr(obj, "Shape", None)
+    return shape is not None and not shape.isNull()
+
+
+def is_visible(obj) -> bool:
+    """Visibility, tolerating a document opened without the GUI."""
+    view = getattr(obj, "ViewObject", None)
+    if view is None:
+        return True
+    try:
+        return bool(view.Visibility)
+    except Exception:
+        return True
+
+
+def collect_objects(doc=None, selection=None) -> list:
+    """The selected objects, or every visible solid when nothing is selected.
+
+    Objects that merely contain others, such as App::Part and bodies whose
+    tip is already included, would otherwise be exported twice, so anything
+    that is an ancestor of another chosen object is dropped.
+    """
+    doc = doc or FreeCAD.ActiveDocument
+    if doc is None:
+        raise ExportError("no active document")
+
+    chosen = [o for o in (selection or []) if has_shape(o)]
+    if not chosen:
+        chosen = [o for o in doc.Objects if has_shape(o) and is_visible(o)]
+    if not chosen:
+        raise ExportError(
+            "nothing to send: no selected object has a shape, and no visible "
+            "object in this document does either"
+        )
+
+    names = {o.Name for o in chosen}
+    pruned = []
+    for obj in chosen:
+        children = {c.Name for c in getattr(obj, "OutList", [])}
+        if children & names:
+            # A container whose contents are already in the list.
+            continue
+        pruned.append(obj)
+    return pruned or chosen
+
+
+def global_shape(obj):
+    """A copy of the shape positioned where it really is in the document.
+
+    Shape.Placement is the object's own placement, which leaves out any
+    App::Part or Link above it. getGlobalPlacement folds those in, and this
+    is the step the stock exporter has historically got wrong.
+    """
+    shape = obj.Shape.copy()
+    try:
+        shape.Placement = obj.getGlobalPlacement()
+    except Exception:
+        # Plain objects outside any container have no global placement.
+        pass
+    return shape
+
+
+def bounding_box_mm(objs) -> tuple:
+    """True size in millimetres, from the globally placed shapes."""
+    box = None
+    for obj in objs:
+        shape_box = global_shape(obj).BoundBox
+        box = shape_box if box is None else box.united(shape_box)
+    if box is None:
+        raise ExportError("no shapes to measure")
+    return (box.XLength, box.YLength, box.ZLength)
+
+
+def object_colour(obj):
+    """The object's colour, or a neutral grey without a GUI."""
+    view = getattr(obj, "ViewObject", None)
+    if view is None:
+        return DEFAULT_COLOUR
+    try:
+        colour = view.ShapeColor
+        return (float(colour[0]), float(colour[1]), float(colour[2]),
+                float(getattr(view, "Transparency", 0)) / 100.0 * -1.0 + 1.0)
+    except Exception:
+        return DEFAULT_COLOUR
+
+
+# ------------------------------------------------------------------- glTF
+
+
+def to_gltf_space(x_mm, y_mm, z_mm):
+    """Millimetres Z up to metres Y up, which is a -90 degree turn about X."""
+    return (x_mm / 1000.0, z_mm / 1000.0, -y_mm / 1000.0)
+
+
+def tessellate(obj, linear, angular):
+    """(positions, normals, indices) for one object, flat shaded.
+
+    Each facet gets its own three vertices so edges stay hard, which is what
+    a machined part should look like.
+    """
+    import MeshPart
+
+    shape = global_shape(obj)
+    mesh = MeshPart.meshFromShape(
+        Shape=shape, LinearDeflection=linear, AngularDeflection=angular,
+        Relative=False,
+    )
+    points, facets = mesh.Topology
+
+    positions = []
+    normals = []
+    indices = []
+    for facet in facets:
+        corners = [points[i] for i in facet]
+        a, b, c = [to_gltf_space(p.x, p.y, p.z) for p in corners]
+        # Winding is preserved by the coordinate change, since it is a
+        # rotation and not a mirror.
+        ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
+        vx, vy, vz = c[0] - a[0], c[1] - a[1], c[2] - a[2]
+        nx, ny, nz = uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx
+        length = (nx * nx + ny * ny + nz * nz) ** 0.5
+        if length == 0:
+            continue  # a degenerate facet contributes nothing
+        normal = (nx / length, ny / length, nz / length)
+        base = len(positions)
+        positions.extend((a, b, c))
+        normals.extend((normal, normal, normal))
+        indices.extend((base, base + 1, base + 2))
+    return positions, normals, indices
+
+
+def _pad4(data: bytes, fill: bytes) -> bytes:
+    remainder = len(data) % 4
+    return data if remainder == 0 else data + fill * (4 - remainder)
+
+
+def build_glb(parts) -> bytes:
+    """Assemble one GLB from [(name, positions, normals, indices, colour)].
+
+    One mesh and one material per object, so colours survive and the lens
+    can still treat the whole thing as a single model.
+    """
+    buffer = bytearray()
+    views = []
+    accessors = []
+    meshes = []
+    materials = []
+    nodes = []
+
+    for name, positions, normals, indices, colour in parts:
+        if not indices:
+            continue
+        pos_bytes = b"".join(struct.pack("<3f", *p) for p in positions)
+        nrm_bytes = b"".join(struct.pack("<3f", *n) for n in normals)
+        idx_bytes = b"".join(struct.pack("<I", i) for i in indices)
+
+        pos_view = len(views)
+        views.append({"buffer": 0, "byteOffset": len(buffer),
+                      "byteLength": len(pos_bytes), "target": TARGET_ARRAY_BUFFER})
+        buffer += pos_bytes
+        nrm_view = len(views)
+        views.append({"buffer": 0, "byteOffset": len(buffer),
+                      "byteLength": len(nrm_bytes), "target": TARGET_ARRAY_BUFFER})
+        buffer += nrm_bytes
+        idx_view = len(views)
+        views.append({"buffer": 0, "byteOffset": len(buffer),
+                      "byteLength": len(idx_bytes),
+                      "target": TARGET_ELEMENT_ARRAY_BUFFER})
+        buffer += idx_bytes
+        while len(buffer) % 4:
+            buffer += b"\x00"
+
+        pos_accessor = len(accessors)
+        accessors.append({
+            "bufferView": pos_view, "componentType": COMPONENT_FLOAT,
+            "count": len(positions), "type": "VEC3",
+            "min": [min(p[i] for p in positions) for i in range(3)],
+            "max": [max(p[i] for p in positions) for i in range(3)],
+        })
+        nrm_accessor = len(accessors)
+        accessors.append({"bufferView": nrm_view, "componentType": COMPONENT_FLOAT,
+                          "count": len(normals), "type": "VEC3"})
+        idx_accessor = len(accessors)
+        accessors.append({"bufferView": idx_view, "componentType": COMPONENT_UINT,
+                          "count": len(indices), "type": "SCALAR"})
+
+        material = len(materials)
+        materials.append({
+            "name": "{0} material".format(name),
+            "pbrMetallicRoughness": {
+                "baseColorFactor": list(colour),
+                "metallicFactor": 0.15,
+                "roughnessFactor": 0.65,
+            },
+            "doubleSided": True,
+        })
+        mesh = len(meshes)
+        meshes.append({"name": name, "primitives": [{
+            "attributes": {"POSITION": pos_accessor, "NORMAL": nrm_accessor},
+            "indices": idx_accessor, "material": material, "mode": 4,
+        }]})
+        nodes.append({"mesh": mesh, "name": name})
+
+    if not nodes:
+        raise ExportError("every object tessellated to nothing")
+
+    gltf = {
+        "asset": {"version": "2.0", "generator": "Holo-CAD SpecsLink"},
+        "scene": 0,
+        "scenes": [{"nodes": list(range(len(nodes)))}],
+        "nodes": nodes,
+        "meshes": meshes,
+        "materials": materials,
+        "buffers": [{"byteLength": len(buffer)}],
+        "bufferViews": views,
+        "accessors": accessors,
+    }
+
+    json_chunk = _pad4(json.dumps(gltf, separators=(",", ":")).encode("utf-8"), b" ")
+    bin_chunk = _pad4(bytes(buffer), b"\x00")
+    total = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    out = bytearray()
+    out += struct.pack("<4sII", b"glTF", 2, total)
+    out += struct.pack("<I4s", len(json_chunk), b"JSON")
+    out += json_chunk
+    out += struct.pack("<I4s", len(bin_chunk), b"BIN\x00")
+    out += bin_chunk
+    return bytes(out)
+
+
+# ---------------------------------------------------------------- exporters
+
+
+def export_fallback(objs, quality=DEFAULT_QUALITY) -> tuple:
+    """(glb bytes, triangle count). Works with or without the GUI."""
+    linear, angular = QUALITY.get(quality, QUALITY[DEFAULT_QUALITY])
+    parts = []
+    triangles = 0
+    for obj in objs:
+        positions, normals, indices = tessellate(obj, linear, angular)
+        triangles += len(indices) // 3
+        parts.append((obj.Label or obj.Name, positions, normals, indices,
+                      object_colour(obj)))
+    return build_glb(parts), triangles
+
+
+def export_stock(objs) -> tuple:
+    """(glb bytes, triangle count or 0). GUI only, raises without it."""
+    try:
+        import ImportGui
+    except ImportError as e:
+        raise ExportError(
+            "the stock glTF exporter needs the FreeCAD GUI, since FreeCAD "
+            "registers .glb against ImportGui ({0})".format(e)
+        )
+    handle, path = tempfile.mkstemp(suffix=".glb", prefix="holocad-")
+    os.close(handle)
+    try:
+        ImportGui.export(objs, path)
+        with open(path, "rb") as f:
+            glb = f.read()
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    if glb[:4] != b"glTF":
+        raise ExportError("the stock exporter did not write a GLB")
+    return glb, 0
+
+
+def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False) -> dict:
+    """Export objs and report what happened.
+
+    Returns id, glb, bbox_mm, triangles and which exporter produced it.
+    """
+    if not objs:
+        raise ExportError("nothing to export")
+
+    bbox = bounding_box_mm(objs)
+    if max(bbox) <= 0:
+        raise ExportError("the selection measures zero in every direction")
+
+    used = "fallback"
+    if prefer_stock:
+        try:
+            glb, triangles = export_stock(objs)
+            used = "stock"
+        except ExportError as e:
+            FreeCAD.Console.PrintWarning(
+                "Holo-CAD: stock exporter unavailable, tessellating instead. "
+                "{0}\n".format(e)
+            )
+            glb, triangles = export_fallback(objs, quality)
+    else:
+        glb, triangles = export_fallback(objs, quality)
+
+    doc = objs[0].Document
+    name = objs[0].Label if len(objs) == 1 else (doc.Label if doc else "model")
+    return {
+        "id": name,
+        "glb": glb,
+        "bbox_mm": bbox,
+        "triangles": triangles,
+        "exporter": used,
+    }

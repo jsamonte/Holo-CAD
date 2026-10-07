@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Live mode</title>
+  <g fill="none" stroke="#2f9fe0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M26 14 L42 22 L42 38 L26 46 L10 38 L10 22 Z"/>
+    <path d="M10 22 L26 30 L42 22"/>
+    <path d="M26 30 L26 46"/>
+  </g>
+  <circle cx="49" cy="17" r="7" fill="#e5534b"/>
+  <g fill="none" stroke="#e5534b" stroke-width="2.6" stroke-linecap="round">
+    <path d="M57 9 A 11 11 0 0 1 57 25"/>
+  </g>
+</svg>

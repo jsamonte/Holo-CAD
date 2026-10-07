@@ -13,6 +13,8 @@ import argparse
 import json
 import re
 import socket
+import ssl
+import sys
 import time
 from pathlib import Path
 
@@ -46,6 +48,28 @@ def lan_ip() -> str:
         return "127.0.0.1"
     finally:
         s.close()
+
+
+def cert_hostnames(cert_path: str) -> list:
+    """DNS names in a certificate, first the SANs, then the common name.
+
+    Used so the public base url does not have to be typed in a second time
+    and cannot disagree with the certificate, which would fail the TLS
+    handshake on the glasses with nothing useful in the logs.
+    """
+    try:
+        decoded = ssl._ssl._test_decode_cert(cert_path)
+    except Exception:
+        return []
+    names = []
+    for kind, value in decoded.get("subjectAltName", ()):
+        if kind == "DNS" and value not in names:
+            names.append(value)
+    for rdn in decoded.get("subject", ()):
+        for key, value in rdn:
+            if key == "commonName" and value not in names:
+                names.append(value)
+    return names
 
 
 def all_ipv4() -> list:
@@ -106,17 +130,31 @@ class ModelStore:
 
 
 class Bridge:
-    def __init__(self, port: int, host_ip: str):
+    def __init__(self, port: int, host_ip: str, public_base: str = ""):
         self.port = port
         self.host_ip = host_ip
+        # Where the glasses should reach this server, which is not where it
+        # listens once a TLS tunnel is in front of it. A published lens cannot
+        # use http or ws at all, so the tunnel's https base goes here and the
+        # model urls handed to the lens are built from it.
+        self.public_base = public_base.rstrip("/")
         self.store = ModelStore(MODELS_DIR)
         self.sockets = set()
         self.started = time.time()
 
+    def base_url(self) -> str:
+        if self.public_base:
+            return self.public_base
+        return "http://{0}:{1}".format(self.host_ip, self.port)
+
+    def socket_url(self) -> str:
+        base = self.base_url()
+        if base.startswith("https://"):
+            return "wss://" + base[len("https://"):] + "/ws"
+        return "ws://" + base[len("http://"):] + "/ws"
+
     def model_url(self, model_id: str, version: int) -> str:
-        return "http://{0}:{1}/models/{2}/{3}.glb".format(
-            self.host_ip, self.port, model_id, version
-        )
+        return "{0}/models/{1}/{2}.glb".format(self.base_url(), model_id, version)
 
     async def broadcast(self, message: dict) -> None:
         payload = json.dumps(message)
@@ -142,6 +180,9 @@ class Bridge:
                 "lenses": len(self.sockets),
                 "host_ip": self.host_ip,
                 "port": self.port,
+                "base_url": self.base_url(),
+                "socket_url": self.socket_url(),
+                "publishable": self.base_url().startswith("https://"),
                 "models": models,
             }
         )
@@ -289,7 +330,24 @@ def build_app(bridge: Bridge) -> web.Application:
     return app
 
 
+def use_utf8_output() -> None:
+    """Stop logging from being able to kill a request handler.
+
+    A Windows console defaults to cp1252, so printing anything outside it,
+    for example the replacement character in a mis-decoded WebSocket frame or
+    an accented FreeCAD document name, raises UnicodeEncodeError inside the
+    handler. Seen for real: a lens connected, the frame log raised, and that
+    socket died while the server carried on looking healthy.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
+
 def main() -> None:
+    use_utf8_output()
     ap = argparse.ArgumentParser(description="Holo-CAD bridge server")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument(
@@ -297,26 +355,85 @@ def main() -> None:
         default=None,
         help="LAN address to put in model URLs, default is auto detected",
     )
+    ap.add_argument(
+        "--public-base",
+        default=None,
+        help=(
+            "Public base url the glasses should use, for example "
+            "https://holo-cad.example.com, when a TLS tunnel fronts this "
+            "server. Required for a lens you intend to publish, because a "
+            "published lens cannot use http or ws at all."
+        ),
+    )
+    ap.add_argument(
+        "--cert",
+        default=None,
+        help=(
+            "PEM certificate chain. With --key this serves https and wss "
+            "directly, which is what a published lens requires. The "
+            "certificate must be one the glasses already trust, so a public "
+            "CA such as Let's Encrypt, not a self signed one."
+        ),
+    )
+    ap.add_argument("--key", default=None, help="PEM private key for --cert")
     args = ap.parse_args()
 
+    if bool(args.cert) != bool(args.key):
+        ap.error("--cert and --key go together")
+
+    ssl_context = None
+    public_base = args.public_base or ""
+    if args.cert:
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        try:
+            ssl_context.load_cert_chain(args.cert, args.key)
+        except (OSError, ssl.SSLError) as e:
+            ap.error("could not load the certificate: {0}".format(e))
+        if not public_base:
+            names = cert_hostnames(args.cert)
+            if not names:
+                ap.error(
+                    "no DNS name found in the certificate, pass --public-base "
+                    "with the hostname the glasses will use"
+                )
+            host = names[0]
+            if args.port != 443:
+                host = "{0}:{1}".format(host, args.port)
+            public_base = "https://" + host
+
     host_ip = args.host_ip or lan_ip()
-    bridge = Bridge(args.port, host_ip)
+    bridge = Bridge(args.port, host_ip, public_base)
 
     print("Holo-CAD bridge")
-    print("  listening on 0.0.0.0:{0}".format(args.port))
+    print("  listening on 0.0.0.0:{0}{1}".format(args.port, " over TLS" if ssl_context else ""))
+    if args.cert:
+        names = cert_hostnames(args.cert)
+        print("  certificate for {0}".format(", ".join(names) if names else "an unreadable name"))
+        print("  the A record for that name must point at {0}".format(host_ip))
     print("  model store {0}".format(MODELS_DIR))
     print("")
     print("Paste this into the lens BridgeClient bridgeUrl input:")
-    print("  ws://{0}:{1}/ws".format(host_ip, args.port))
+    print("  {0}".format(bridge.socket_url()))
     print("")
-    print("  health check   http://{0}:{1}/status".format(host_ip, args.port))
-    others = [ip for ip in all_ipv4() if ip != host_ip]
-    if others:
-        print("  other addresses on this host: {0}".format(", ".join(others)))
-        print("  (if the glasses cannot reach the one above, try these)")
+    print("  health check   {0}/status".format(bridge.base_url()))
+    if bridge.public_base:
+        print("  secure scheme, so this lens can be published")
+    else:
+        print("  plain ws and http, so the lens needs Experimental APIs on")
+        print("  and CANNOT be published. Pass --public-base for that.")
+        others = [ip for ip in all_ipv4() if ip != host_ip]
+        if others:
+            print("  other addresses on this host: {0}".format(", ".join(others)))
+            print("  (if the glasses cannot reach the one above, try these)")
     print("", flush=True)
 
-    web.run_app(build_app(bridge), host="0.0.0.0", port=args.port, print=None)
+    web.run_app(
+        build_app(bridge),
+        host="0.0.0.0",
+        port=args.port,
+        ssl_context=ssl_context,
+        print=None,
+    )
 
 
 if __name__ == "__main__":

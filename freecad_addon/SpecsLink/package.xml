@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>Holo-CAD SpecsLink</name>
+  <description>
+    Send FreeCAD models to Snapchat Spectacles at their true physical size,
+    and keep them updating while you edit. Serves the model from inside
+    FreeCAD, so nothing else needs installing.
+  </description>
+  <version>0.1.0</version>
+  <date>2026-10-07</date>
+  <maintainer email="jared.v.samonte@gmail.com">Jared Samonte</maintainer>
+  <license file="LICENSE">MIT</license>
+  <url type="repository">https://github.com/jsamonte/Holo-CAD</url>
+  <icon>icons/workbench.svg</icon>
+  <content>
+    <workbench>
+      <classname>SpecsLinkWorkbench</classname>
+      <!-- Without this, FreeCAD looks for a folder named after the workbench
+           and every startup prints "Error in InitApplications ... cannot find
+           the file Mod\SpecsLink\Holo-CAD". The addon is the folder itself. -->
+      <subdirectory>./</subdirectory>
+      <name>Holo-CAD</name>
+      <description>FreeCAD to Spectacles, at true size</description>
+      <icon>icons/workbench.svg</icon>
+      <freecadmin>1.0</freecadmin>
+    </workbench>
+  </content>
+</package>

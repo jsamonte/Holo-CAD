@@ -17,10 +17,13 @@ import json
 import aiohttp
 
 
-async def run(url: str, seconds: float, download: bool) -> int:
+async def run(url: str, seconds: float, download: bool, insecure: bool = False) -> int:
     seen = 0
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=None)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    # insecure is for testing a TLS setup with a throwaway certificate. The
+    # glasses will not accept one, so it proves plumbing, never readiness.
+    connector = aiohttp.TCPConnector(ssl=False) if insecure else None
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         print("connecting to {0}".format(url), flush=True)
         async with session.ws_connect(url) as ws:
             print("connected", flush=True)
@@ -59,8 +62,10 @@ def main() -> None:
     ap.add_argument("--url", default="ws://127.0.0.1:8765/ws")
     ap.add_argument("--seconds", type=float, default=15.0)
     ap.add_argument("--no-download", action="store_true")
+    ap.add_argument("--insecure", action="store_true",
+                    help="skip TLS verification, for testing a cert the machine does not trust")
     args = ap.parse_args()
-    raise SystemExit(asyncio.run(run(args.url, args.seconds, not args.no_download)))
+    raise SystemExit(asyncio.run(run(args.url, args.seconds, not args.no_download, args.insecure)))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/4304e7ac-bd46-4673-8713-78c24e59c076>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> fdd36676-d9a3-4906-a10f-129160ae509e
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/fdd36676-d9a3-4906-a10f-129160ae509e>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 03575426-f713-421c-bcbb-4ce317329821
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    cameraObject: false
+    labelSizeCm: false
+    lineMaterial: false
+    modelLoaderObject: false
+    visibleAtStart: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      lineMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      visibleAtStart: false
+      labelSizeCm: !<float> 2.000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input SceneObject modelLoaderObject {"hint":"Object holding the ModelLoader. Leave empty to look on this object."}'
+    - '// @input Asset.Material lineMaterial {"hint":"Unlit material for the wireframe. Without one the box is skipped."}'
+    - '// @input bool visibleAtStart {"hint":"Show the box as soon as a model arrives."}'
+    - '// @input float labelSizeCm = 2 {"hint":"Label size in cm. Labels always face you."}'
+    - '// @input SceneObject cameraObject {"hint":"Camera the labels turn to face. Leave empty to find the main camera."}'

@@ -102,6 +102,11 @@ Bridge to Lens, one JSON message per update:
 
 Stop after each phase, tell me exactly how to test it, and wait for me to confirm before moving on.
 
+> Status 2026-10-07: 1 and 2 done and tested on the laptop, 3 and 4 written
+> and compiling, 5 part done. Nothing has been on the glasses yet, so the
+> ruler check, grabbing and the overlay are unproven. README.md has the
+> table.
+
 1. **Networking proof**: bridge serves `test_cube.glb`; the Lens connects, loads it, and shows it at 1:1. Includes Lens Studio setup and firewall steps.
 2. **FreeCAD send**: Send to Spectacles with `true_size`; pass the 100 mm cube acceptance test.
 3. **Scale and interaction**: ratio and fit modes, dimension overlay, placement, grab/move/rotate.
@@ -110,7 +115,7 @@ Stop after each phase, tell me exactly how to test it, and wait for me to confir
 
 ## Later (do not build yet)
 
-- HTTPS/WSS through a tunnel (for example cloudflared) so it works off the LAN and the Lens could be published without Experimental APIs.
+- ~~HTTPS/WSS through a tunnel (for example cloudflared) so it works off the LAN and the Lens could be published without Experimental APIs.~~ **Pulled into scope on 2026-10-07**, because publishing turned out to be a requirement rather than a nice to have. See "Publishing" below.
 - Parameter sliders in the Lens that write back to a FreeCAD Spreadsheet so I can resize the part from the glasses.
 
 ## Working rules
@@ -148,3 +153,56 @@ assumed.
 - Two fields were added to the `model_update` message: `pushed_ms` (laptop epoch
   milliseconds) and `bytes`. Both are optional and the lens tolerates their
   absence.
+- One message was added, for phase 5's per body updates:
+
+  ```json
+  { "type": "model_remove", "id": "bracket" }
+  ```
+
+  Without it, deleting or hiding a body in FreeCAD leaves it hanging in the
+  air, because nothing else ever tells the lens it went away. The lens
+  destroys that model's root and forgets it.
+- Per body sends skip an object whose export is unchanged. "Unchanged" covers
+  the GLB bytes **and** the requested scale, because switching 1:1 to 1:10
+  leaves the geometry identical and would otherwise be silently dropped.
+  Pressing Send always sends; the skipping exists for live mode.
+
+### The deliverable is two downloads, and distribution is GitHub
+
+Decided 2026-10-07, and it overrides the repo layout above. **Anyone must be
+able to download the FreeCAD addon and the Lens, and have it work, with no
+other download or install.** That has two consequences.
+
+**The separate bridge server is gone.** A `bridge/` with its own venv and
+`pip install aiohttp` is an install, so the server moves **inside the FreeCAD
+addon** and obeys the addon's existing rule: standard library only, nothing
+pip installed into FreeCAD's Python. FreeCAD itself serves the GLB over HTTP
+and speaks the WebSocket. The lens is unchanged, since it only ever knew about
+a url. `bridge/` survives as a development harness, not as something a user
+touches.
+
+**Nobody hosts anything. That is the shipped design**, settled 2026-10-07
+after a long back and forth.
+
+On the user's own network the lens talks to FreeCAD directly over `ws://`,
+which requires Experimental APIs, which blocks publishing. Distribution is
+then this repository, which Snap's
+[Open Source category](https://developers.snap.com/spectacles/spectacles-community/community-challenge)
+explicitly allows for lenses using Experimental APIs. The catch is that the
+recipient needs Lens Studio to put the lens on their glasses, which is a third
+install.
+
+**Publishing was explored and is not being used.** A published lens may only
+use `wss`, which needs a certificate for a hostname resolving to one specific
+machine, and no user's laptop can have one. One published build carries one
+hostname, so it cannot point at each user's own machine either. Publishing
+therefore requires a single shared relay that every model passes through, run
+and paid for by somebody. Rejected: the point of the project is that each
+person runs their own.
+
+A working relay is in `relay/` anyway, with `docs/RELAY.md`, because it also
+covers reaching your own glasses from outside your own network, and because
+the decision may be revisited. The addon can serve locally and upload to a
+relay at the same time, so it costs nothing to leave in place. Note that
+self-hosting a relay does **not** make a lens publishable for anyone but
+whoever builds the lens against it.

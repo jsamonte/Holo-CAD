@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Send to Spectacles</title>
+  <g fill="none" stroke="#2f9fe0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M24 12 L40 20 L40 36 L24 44 L8 36 L8 20 Z"/>
+    <path d="M8 20 L24 28 L40 20"/>
+    <path d="M24 28 L24 44"/>
+  </g>
+  <g fill="none" stroke="#3fb950" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M44 32 L58 32"/>
+    <path d="M52 26 L58 32 L52 38"/>
+  </g>
+</svg>

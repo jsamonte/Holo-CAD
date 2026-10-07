@@ -4,6 +4,7 @@
     - !<own> 00000000-0000-0065-0000-000000000064
     - !<own> 0005641c-028d-459a-0000-000000014b4d
     - !<own> 5aa0f98b-e799-448c-a2dc-cae5d04fa2a4
+    - !<own> 4a3c8b50-7d60-413a-bc58-a11643c050f2
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       []
@@ -186,6 +187,46 @@
     - !<own> 8b1597e7-0f83-4295-a17b-d12cd299f954
   Components:
     []
+- !<ScriptComponent/01fcdc29-9e43-47c0-a2c5-3af319589b70>
+  PrefabRemaps:
+    []
+  Name: ModelPlacement
+  Enabled: true
+  ScriptAsset: !<reference> f810eac0-7d47-47a7-a8a6-a8d7e71ffde7
+  ScriptInputsDefault:
+    modelLoaderObject: true
+    allowManipulation: true
+    freeScale: true
+    grabPaddingCm: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      allowManipulation: true
+      freeScale: false
+      grabPaddingCm: !<float> 2.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/02fdc4dc-2753-4f4a-b88e-309b3d14df8d>
+  PrefabRemaps:
+    []
+  Name: StatusPanel
+  Enabled: true
+  ScriptAsset: !<reference> e8bbddfb-848d-458e-80f4-fa197c7e59a4
+  ScriptInputsDefault:
+    statusText: true
+    sourceObject: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      sourceObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/031abae4-7029-4da6-89ec-08d2369c519f>
   PrefabRemaps:
     []
@@ -216,6 +257,30 @@
     - !<own> c89d7e48-75a6-414e-a253-874f80bfe792
   Components:
     []
+- !<ScriptComponent/0656ee40-5af1-41ae-b84e-6cc362bb94b3>
+  PrefabRemaps:
+    []
+  Name: DimensionOverlay
+  Enabled: true
+  ScriptAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
+  ScriptInputsDefault:
+    modelLoaderObject: true
+    lineMaterial: true
+    visibleAtStart: true
+    labelSizeCm: true
+    cameraObject: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      lineMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      visibleAtStart: false
+      labelSizeCm: !<float> 2.000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/0f704a07-d079-4984-9aaf-bf4a989b3490>
   PrefabRemaps:
     []
@@ -396,6 +461,35 @@
     - !<own> 298f274e-575f-40f7-a4f3-e4eaeaaecd67
   Components:
     []
+- !<ScriptComponent/1f1a6cfb-6bde-4e39-8577-21075ab11573>
+  PrefabRemaps:
+    []
+  Name: ModelLoader
+  Enabled: true
+  ScriptAsset: !<reference> 74704b0a-30f9-4f82-9056-c10b6fdbcb79
+  ScriptInputsDefault:
+    bridgeClientObject: true
+    modelsParent: true
+    cameraObject: true
+    spawnDistanceCm: true
+    spawnDropCm: true
+    axisTolerance: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
+      remoteMediaModule: !<reference.RemoteMediaModule> 5585ebf2-64c6-44eb-832c-690bbb357032
+      material: !<reference.Material> c69ebc19-cdbb-4195-bcc6-4029941362d0
+      bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      modelsParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnDistanceCm: !<float> 50.000000
+      spawnDropCm: !<float> 15.000000
+      axisTolerance: 0.010000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/1fbad860-d2cc-4f57-a307-5ac38abfa448>
   PrefabRemaps:
     []
@@ -649,6 +743,25 @@
     - !<own> edc3f854-bedb-4fbf-924b-9f93e6264c2f
   Components:
     []
+- !<ScriptComponent/31fbe5db-ae10-4e6c-a6cb-6992f5eb20c4>
+  PrefabRemaps:
+    []
+  Name: BridgeClient
+  Enabled: true
+  ScriptAsset: !<reference> 34b49d7c-5f20-4a49-b9ff-30114ec33638
+  ScriptInputsDefault:
+    pingSeconds: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      bridgeUrl: "ws://192.168.1.56:8765/ws"
+      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
+      verbose: true
+      pingSeconds: !<float> 15.000000
+  ScriptTypes:
+    "":
+      {}
 - !<ScriptComponent/329940fb-34dd-413d-8f14-ed6fa1f135b5>
   PrefabRemaps:
     []
@@ -941,6 +1054,25 @@
     []
   Components:
     - !<own> 55be292f-0363-41f1-b55c-70fcb8e4dd25
+- !<SceneObject/4a3c8b50-7d60-413a-bc58-a11643c050f2>
+  PrefabRemaps:
+    []
+  Name: HoloCAD
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 31fbe5db-ae10-4e6c-a6cb-6992f5eb20c4
+    - !<own> 1f1a6cfb-6bde-4e39-8577-21075ab11573
+    - !<own> 01fcdc29-9e43-47c0-a2c5-3af319589b70
+    - !<own> 0656ee40-5af1-41ae-b84e-6cc362bb94b3
+    - !<own> 02fdc4dc-2753-4f4a-b88e-309b3d14df8d
 - !<SceneObject/4a8fba8e-5e79-4c17-9b90-eecc02c7b7dc>
   PrefabRemaps:
     []

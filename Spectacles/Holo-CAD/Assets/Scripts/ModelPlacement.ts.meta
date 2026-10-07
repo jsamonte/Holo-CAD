@@ -1,0 +1,53 @@
+- !<AssetImportMetadata/460f43a5-44e9-4159-9288-40051ac7aeb9>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> f810eac0-7d47-47a7-a8a6-a8d7e71ffde7
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> f810eac0-7d47-47a7-a8a6-a8d7e71ffde7
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 36ec680a-15bf-4afc-a6aa-b862037ef2e3
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/36ec680a-15bf-4afc-a6aa-b862037ef2e3>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: d6a64a64-db9e-46aa-85d3-34ce6530aab7
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    allowManipulation: false
+    freeScale: false
+    grabPaddingCm: false
+    modelLoaderObject: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      allowManipulation: true
+      freeScale: false
+      grabPaddingCm: !<float> 2.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input SceneObject modelLoaderObject {"hint":"Object holding the ModelLoader. Leave empty to look on this object."}'
+    - '// @input bool allowManipulation = true {"hint":"Let the model be grabbed, moved and turned."}'
+    - '// @input bool freeScale {"hint":"Allow pinch to resize. Off keeps the model at the size FreeCAD says."}'
+    - '// @input float grabPaddingCm = 2 {"hint":"Padding added to the grab box, in cm, so thin parts stay catchable."}'

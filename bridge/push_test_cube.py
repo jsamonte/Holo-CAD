@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 import urllib.error
 import urllib.request
 import uuid
@@ -52,7 +53,7 @@ def build_multipart(metadata: dict, glb: bytes, filename: str):
     return "multipart/form-data; boundary=" + boundary, body
 
 
-def push(bridge_url: str, metadata: dict, glb: bytes, filename: str, timeout=30.0):
+def push(bridge_url: str, metadata: dict, glb: bytes, filename: str, timeout=30.0, insecure=False):
     content_type, body = build_multipart(metadata, glb, filename)
     url = bridge_url.rstrip("/") + "/push"
     req = urllib.request.Request(
@@ -61,7 +62,14 @@ def push(bridge_url: str, metadata: dict, glb: bytes, filename: str, timeout=30.
         headers={"Content-Type": content_type, "Content-Length": str(len(body))},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    # insecure is for testing a TLS setup with a throwaway certificate. The
+    # glasses will not accept one, so it proves plumbing, never readiness.
+    context = None
+    if insecure:
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
@@ -74,6 +82,8 @@ def main() -> None:
     ap.add_argument("--factor", type=float, default=1.0)
     ap.add_argument("--target-mm", type=float, default=None)
     ap.add_argument("--bbox-mm", default="100,100,100", help="x,y,z in mm")
+    ap.add_argument("--insecure", action="store_true",
+                    help="skip TLS verification, for testing a cert this machine does not trust")
     args = ap.parse_args()
 
     glb_path = Path(args.glb)
@@ -94,7 +104,7 @@ def main() -> None:
 
     print("pushing {0} ({1} bytes) to {2}".format(glb_path.name, len(glb), args.bridge))
     try:
-        result = push(args.bridge, metadata, glb, glb_path.name)
+        result = push(args.bridge, metadata, glb, glb_path.name, insecure=args.insecure)
     except urllib.error.HTTPError as e:
         raise SystemExit("bridge rejected the push: {0} {1}".format(e.code, e.read().decode("utf-8", "replace")))
     except urllib.error.URLError as e:
