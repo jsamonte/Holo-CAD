@@ -267,8 +267,17 @@ export class ModelLoader extends BaseScriptComponent {
     const bbox = new vec3(update.bbox_mm.x, update.bbox_mm.y, update.bbox_mm.z)
     const targetMaxMm = Math.max(bbox.x, bbox.y, bbox.z)
 
+    // The addon states how many Lens Studio units one file unit is worth,
+    // because it wrote the file. That is used in preference to measuring
+    // the loaded mesh, which is not trustworthy: across a real 21 part
+    // assembly the measured box came out two to five times too large for
+    // most parts, so each was scaled by a wrong factor of its own and the
+    // assembly fell apart. The measurement is kept as a cross check.
     let correction = 1
-    if (targetMaxMm > 0) {
+    if (update.cm_per_unit > 0) {
+      correction = update.cm_per_unit
+      this.checkStatedScale(update, loadedMax, targetMaxMm, correction)
+    } else if (targetMaxMm > 0) {
       // Lens Studio units are centimetres, so the true size in cm is mm / 10.
       correction = targetMaxMm / 10 / loadedMax
       this.checkProportions(update, loaded, bbox, correction)
@@ -295,7 +304,7 @@ export class ModelLoader extends BaseScriptComponent {
     // Where the part belongs within the assembly. The offset arrives in
     // millimetres, Lens Studio works in centimetres, and a model asked for
     // at 1:10 has to be laid out at 1:10 too or the assembly comes apart.
-    const offsetCm = update.offset_mm.uniformScale(requested / 10)
+    const offsetCm = (update.offset_mm ?? vec3.zero()).uniformScale(requested / 10)
     entry.offsetCm = offsetCm
     entry.root.getTransform().setLocalPosition(offsetCm)
 
@@ -314,8 +323,15 @@ export class ModelLoader extends BaseScriptComponent {
     entry.current = staging
     entry.currentVersion = update.version
 
-    // Size as rendered, in mm, which is what the acceptance test checks.
-    const shownMm = loaded.uniformScale(finalScale * 10)
+    // Size as rendered, in mm, which is what the acceptance test checks,
+    // and what the dimension box and the grab collider are built from.
+    //
+    // Taken from the size FreeCAD reported rather than from the measured
+    // mesh, for the same reason the scale is: the measurement was wrong for
+    // most parts, which made both the wireframe and the grab box the wrong
+    // size as well. bbox_mm is in document axes, so it needs the same Z up
+    // to Y up turn as the geometry: document Z becomes height.
+    const shownMm = ModelLoader.statedSize(update, bbox, requested, loaded, finalScale)
     const loadSeconds = getTime() - update.receivedAt
     const ratioLabel = ModelLoader.ratioLabel(requested)
 
@@ -324,6 +340,8 @@ export class ModelLoader extends BaseScriptComponent {
         `size ${shownMm.x.toFixed(1)} x ${shownMm.y.toFixed(1)} x ${shownMm.z.toFixed(1)} mm  ` +
         `(true ${bbox.x.toFixed(1)} x ${bbox.y.toFixed(1)} x ${bbox.z.toFixed(1)} mm)  ` +
         `correction ${correction.toFixed(4)}  meshes ${box.meshes}  ` +
+        `at ${offsetCm.x.toFixed(2)}, ${offsetCm.y.toFixed(2)}, ` +
+        `${offsetCm.z.toFixed(2)} cm  ` +
         `load ${(loadSeconds * 1000).toFixed(0)} ms`
     )
 
@@ -343,6 +361,55 @@ export class ModelLoader extends BaseScriptComponent {
   }
 
   /**
+   * The rendered size in millimetres, from whichever source can be trusted.
+   *
+   * With a stated scale the true size is known, so it is used directly,
+   * turned into the lens's axes. Without one the lens is measuring anyway
+   * and the measured box is all there is.
+   */
+  private static statedSize(
+    update: ModelUpdate,
+    bbox: vec3,
+    requested: number,
+    loaded: vec3,
+    finalScale: number
+  ): vec3 {
+    if (update.cm_per_unit > 0 && Math.max(bbox.x, bbox.y, bbox.z) > 0) {
+      // Document X stays X, document Z is the height, document Y is depth.
+      return new vec3(bbox.x, bbox.z, bbox.y).uniformScale(requested)
+    }
+    return loaded.uniformScale(finalScale * 10)
+  }
+
+  /**
+   * Warn when the stated scale and the loaded mesh disagree badly.
+   *
+   * Not a failure: the measurement is the less trustworthy of the two, which
+   * is why it is no longer in charge. But a tenfold disagreement would mean
+   * the exporter and the lens have genuinely diverged, and that is worth
+   * seeing rather than silently drawing the part at the stated size.
+   */
+  private checkStatedScale(
+    update: ModelUpdate,
+    loadedMax: number,
+    targetMaxMm: number,
+    correction: number
+  ): void {
+    if (loadedMax <= 0 || targetMaxMm <= 0) {
+      return
+    }
+    const wouldBeMm = loadedMax * correction * 10
+    const ratio = wouldBeMm / targetMaxMm
+    if (ratio > 1.5 || ratio < 0.67) {
+      print(
+        `${TAG}: NOTE ${update.id} measures ${wouldBeMm.toFixed(1)} mm at the ` +
+          `stated scale but FreeCAD reports ${targetMaxMm.toFixed(1)} mm. ` +
+          `Drawing it at the size FreeCAD reports.`
+      )
+    }
+  }
+
+  /**
    * Whether the addon centred the mesh and told us where it belongs.
    *
    * An offset of exactly zero is the normal case for a single model, which
@@ -351,7 +418,7 @@ export class ModelLoader extends BaseScriptComponent {
    * those models still get recentred here.
    */
   private centredByAddon(update: ModelUpdate): boolean {
-    return update.offset_mm !== undefined && update.offset_mm !== null
+    return update.offset_mm !== null
   }
 
   // ---- colour ------------------------------------------------------------

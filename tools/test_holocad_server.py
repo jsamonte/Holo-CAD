@@ -139,6 +139,15 @@ def main() -> int:
           dead.send_text("{}") is False)
     check("and marks it closed", dead.closed is True)
 
+    print("the stated unit scale is cleaned before it goes out")
+    check("a positive scale survives", hs._clean_scale(100.0) == 100.0)
+    check("nothing means 0, which tells the lens to measure instead",
+          hs._clean_scale(None) == 0.0)
+    check("zero and negatives are refused",
+          hs._clean_scale(0) == 0.0 and hs._clean_scale(-5) == 0.0)
+    check("rubbish is refused", hs._clean_scale("big") == 0.0)
+    check("an infinity is refused", hs._clean_scale(float("inf")) == 0.0)
+
     print("offsets are cleaned before they go out")
     check("three floats survive",
           hs._clean_offset([1.5, -2.0, 3.0]) == [1.5, -2.0, 3.0])

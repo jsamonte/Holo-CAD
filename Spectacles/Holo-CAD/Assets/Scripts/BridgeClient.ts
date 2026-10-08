@@ -50,7 +50,16 @@ export type ModelUpdate = {
    * part's mesh is written about its own origin, so without this every part
    * of an assembly would arrive stacked on the same spot.
    */
-  offset_mm: vec3
+  offset_mm: vec3 | null
+  /**
+   * Lens Studio units per unit in the file, or 0 when the addon cannot say.
+   *
+   * The lens used to derive this by measuring the mesh it had loaded. That
+   * measurement is unreliable: across a real 21 part assembly it came out
+   * between two and five times too large for most parts, so each was scaled
+   * by a wrong factor of its own.
+   */
+  cm_per_unit: number
   pushed_ms?: number
   bytes?: number
   /** Seconds on the lens clock when this message arrived. */
@@ -405,6 +414,7 @@ export class BridgeClient extends BaseScriptComponent {
       triangles: Number(raw.triangles) || 0,
       colours: BridgeClient.parseColours(raw.colours),
       offset_mm: BridgeClient.parseOffset(raw.offset_mm),
+      cm_per_unit: Number(raw.cm_per_unit) > 0 ? Number(raw.cm_per_unit) : 0,
       pushed_ms: typeof raw.pushed_ms === "number" ? raw.pushed_ms : undefined,
       bytes: typeof raw.bytes === "number" ? raw.bytes : undefined,
       receivedAt: getTime()
@@ -419,16 +429,24 @@ export class BridgeClient extends BaseScriptComponent {
    * the template material looks like a rendering bug rather than bad input,
    * and an older addon that sends no colours at all is a case to support.
    */
-  /** An offset as a vec3, defaulting to the origin. */
-  private static parseOffset(raw: any): vec3 {
+  /**
+   * An offset as a vec3, or null when none arrived.
+   *
+   * Null rather than the origin, because the two mean different things: an
+   * addon that sends no offset wants the lens to centre the mesh itself,
+   * while one that sends (0, 0, 0) is saying this part sits exactly on the
+   * assembly's origin. Returning the origin for both made every model look
+   * as though it had been centred by the addon.
+   */
+  private static parseOffset(raw: any): vec3 | null {
     if (!Array.isArray(raw) || raw.length < 3) {
-      return vec3.zero()
+      return null
     }
     const out = []
     for (let i = 0; i < 3; i++) {
       const value = Number(raw[i])
       if (!isFinite(value)) {
-        return vec3.zero()
+        return null
       }
       out.push(value)
     }

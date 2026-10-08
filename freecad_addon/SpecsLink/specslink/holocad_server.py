@@ -56,6 +56,17 @@ OP_PING = 0x9
 OP_PONG = 0xA
 
 
+def _clean_scale(value):
+    """A positive finite scale, or 0 meaning "work it out yourself"."""
+    try:
+        scale = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    if scale != scale or scale <= 0.0 or scale == float("inf"):
+        return 0.0
+    return scale
+
+
 def _clean_offset(offset):
     """An offset as three plain floats, or zeros.
 
@@ -350,7 +361,7 @@ class Bridge:
     # ---- the one call the addon makes ----
 
     def publish(self, model_id: str, glb: bytes, bbox_mm, scale=None, triangles=0,
-                colours=None, offset_mm=None) -> dict:
+                colours=None, offset_mm=None, cm_per_unit=None) -> dict:
         """Store a GLB and tell every connected lens about it.
 
         bbox_mm is the true size in millimetres, which is what the lens
@@ -386,6 +397,9 @@ class Bridge:
             # Where this part sits inside the send, in the lens's axes and in
             # millimetres. Zero for a single model, which is its own origin.
             "offset_mm": _clean_offset(offset_mm),
+            # Lens Studio units per file unit, or 0 when the exporter cannot
+            # say and the lens has to measure instead.
+            "cm_per_unit": _clean_scale(cm_per_unit),
             "pushed_ms": int(time.time() * 1000),
             "bytes": len(glb),
         }

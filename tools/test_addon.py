@@ -86,6 +86,8 @@ def main() -> int:
               and all(0.0 <= v <= 1.0 for v in metadata["colours"][0]),
               str(metadata["colours"]))
 
+        check("the lens is told the file's units outright",
+              metadata["cm_per_unit"] == 100.0, str(metadata["cm_per_unit"]))
         check("a lone send sits at the origin",
               metadata["offset_mm"] == [0.0, 0.0, 0.0],
               str(metadata["offset_mm"]))

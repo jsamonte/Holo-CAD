@@ -24,7 +24,8 @@
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 
-import {HANDLE} from "./FloatingPanel"
+import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation"
+
 import {ModelLoader} from "./ModelLoader"
 import {ModelPlacement} from "./ModelPlacement"
 
@@ -64,46 +65,36 @@ export class ControlPanel extends BaseScriptComponent {
   @hint("Stack the buttons vertically rather than in a row.")
   vertical: boolean = true
 
+  @input
+  @hint("How far the panel may move during a pinch and still count as a button press, in cm.")
+  tapSlopCm: number = 1.5
+
   private placement: ModelPlacement | null = null
   private loader: ModelLoader | null = null
   private grabLabel: Text | null = null
 
   onAwake(): void {
-    // In onAwake, not start: FloatingPanel looks for the handle in its own
-    // start, and every onAwake runs before any start, so this is the only
-    // ordering that works without wiring the two components together.
-    this.buildHandle()
     this.createEvent("OnStartEvent").bind(() => this.start())
   }
 
-  /**
-   * A strip above the buttons to drag the panel by.
-   *
-   * The panel could not be moved before. Its face is covered in buttons,
-   * each with its own Interactable, and a pinch goes to the innermost one,
-   * so every attempt to drag the panel pressed a button instead.
-   */
-  private buildHandle(): void {
+  /** The panel's name, above the buttons. Not a control, just a label. */
+  private buildTitle(): void {
+    if (this.title.length === 0) {
+      return
+    }
     const panel = this.getSceneObject()
     const step = this.buttonHeightCm + this.spacingCm
     const stride = this.vertical ? step : this.buttonWidthCm + this.spacingCm
-    const top = (3 * stride) / 2 + step * (this.title.length > 0 ? 2 : 1)
+    const top = (3 * stride) / 2 + step
 
-    const handle = global.scene.createSceneObject(HANDLE)
-    handle.setParent(panel)
-    handle.getTransform().setLocalPosition(new vec3(0, top, 0))
-
-    const label = handle.createComponent("Component.Text")
-    label.text = this.title.length > 0 ? this.title : "drag"
+    const object = global.scene.createSceneObject("holocad_panel_title")
+    object.setParent(panel)
+    object.getTransform().setLocalPosition(new vec3(0, top, 0))
+    const label = object.createComponent("Component.Text")
+    label.text = this.title
     label.size = Math.max(8, Math.round(this.buttonHeightCm * 6))
     label.horizontalAlignment = HorizontalAlignment.Center
     label.verticalAlignment = VerticalAlignment.Center
-
-    const collider = handle.createComponent("Physics.ColliderComponent")
-    collider.debugDrawEnabled = false
-    const box = Shape.createBoxShape()
-    box.size = new vec3(this.buttonWidthCm, this.buttonHeightCm * 1.4, 2)
-    collider.shape = box
   }
 
   private start(): void {
@@ -114,6 +105,7 @@ export class ControlPanel extends BaseScriptComponent {
       return
     }
 
+    this.buildTitle()
     this.build()
 
     // Keep the grab button honest if something else flips the mode.
@@ -129,9 +121,6 @@ export class ControlPanel extends BaseScriptComponent {
 
     // Four buttons, centred on the panel.
     const offset = (3 * stride) / 2
-
-    // No title text here: the handle above the buttons carries it, and two
-    // copies of the same word on one panel reads as a mistake.
 
     this.addButton(panel, "Reset size", 0, offset, stride, () => {
       if (this.placement !== null) {
@@ -210,8 +199,33 @@ export class ControlPanel extends BaseScriptComponent {
     box.size = new vec3(this.buttonWidthCm, this.buttonHeightCm, 2)
     collider.shape = box
 
+    // The button drags the panel as well as being pressable. A pinch
+    // always goes to the innermost Interactable, so without this the
+    // buttons would be dead patches you could not drag the panel by, which
+    // is most of its face.
     const interactable = object.createComponent(Interactable.getTypeName())
+    const drag = object.createComponent(InteractableManipulation.getTypeName())
+    drag.setCanTranslate(true)
+    drag.setCanRotate(false)
+    drag.setCanScale(false)
+    drag.setManipulateRoot(parent.getTransform())
+
+    // Tap or drag, decided by whether the panel actually moved. Pressing a
+    // button after dragging the panel by it would mean you could not move
+    // the panel without resetting something.
+    let startedAt: vec3 | null = null
+    interactable.onTriggerStart.add(() => {
+      startedAt = parent.getTransform().getWorldPosition()
+    })
     interactable.onTriggerEnd.add(() => {
+      const from = startedAt
+      startedAt = null
+      if (from !== null) {
+        const moved = parent.getTransform().getWorldPosition().distance(from)
+        if (moved > this.tapSlopCm) {
+          return
+        }
+      }
       tapped()
       this.refresh()
     })

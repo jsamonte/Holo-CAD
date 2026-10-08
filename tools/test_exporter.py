@@ -316,6 +316,25 @@ def main() -> int:
     check("so the correction a curved part produces is still 100",
           close(corr, 100.0, 1.0), "{0:.4f}".format(corr))
 
+    print("the exporter states its own units, rather than leaving the lens to guess")
+    # The lens used to derive this by measuring the mesh it had loaded, and
+    # that measurement was wrong for most of a real assembly: corrections
+    # came out between 21 and 39 where every one should be 100, so parts
+    # were scaled by a wrong factor of their own.
+    stated = exporter.export([box])
+    check("one file unit is 100 lens units, since the file is in metres",
+          close(stated["cm_per_unit"], 100.0),
+          str(stated["cm_per_unit"]))
+    # Tied to the conversion itself, so the two cannot drift apart.
+    check("and that follows from the millimetres per unit",
+          close(stated["cm_per_unit"], exporter.MM_PER_UNIT / 10.0))
+    gltf_stated, _ = read_glb(stated["glb"])
+    span = max(measured_extent(gltf_stated))
+    check("so the stated scale reproduces the true size",
+          close(span * stated["cm_per_unit"] * 10, max(stated["bbox_mm"]), 0.01),
+          "{0} vs {1}".format(span * stated["cm_per_unit"] * 10,
+                              max(stated["bbox_mm"])))
+
     print("colours are reported beside the model, and land in the GLB")
     # Headless there is no ViewObject, so object_colour falls back to its
     # default. That is the case worth pinning anyway: the lens must get a

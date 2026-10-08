@@ -270,9 +270,19 @@ def _shifted(point, shift):
     return (point[0] - shift[0], point[1] - shift[1], point[2] - shift[2])
 
 
+# The exporter writes glTF in metres, which the spec asks for, so one file
+# unit is 1000 mm. Lens Studio works in centimetres, so one file unit is 100
+# of its units. The lens is told this rather than working it out by measuring
+# the mesh it loaded: that measurement came out wrong for most of a real
+# assembly, by factors between two and five, and a part scaled by a factor of
+# its own looks both the wrong size and in the wrong place.
+MM_PER_UNIT = 1000.0
+CM_PER_UNIT = MM_PER_UNIT / 10.0
+
+
 def to_gltf_space(x_mm, y_mm, z_mm):
     """Millimetres Z up to metres Y up, which is a -90 degree turn about X."""
-    return (x_mm / 1000.0, z_mm / 1000.0, -y_mm / 1000.0)
+    return (x_mm / MM_PER_UNIT, z_mm / MM_PER_UNIT, -y_mm / MM_PER_UNIT)
 
 
 def tessellate(obj, linear, angular, shift=(0.0, 0.0, 0.0)):
@@ -530,4 +540,9 @@ def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False,
         # build_glb writes the meshes in.
         "colours": [[round(c, 6) for c in object_colour(obj)] for obj in objs],
         "offset_mm": [round(v, 6) for v in offset_mm],
+        # How many Lens Studio units one file unit is worth. Known exactly
+        # for the tessellating exporter, which writes metres. The stock
+        # exporter writes whatever it likes, so it reports nothing and the
+        # lens falls back to measuring.
+        "cm_per_unit": CM_PER_UNIT if used == "fallback" else None,
     }

@@ -183,9 +183,8 @@ assembly, and deleting one removes it from the glasses.
 - The wireframe box and its measurements **appear only when your hand is near
   enough to pinch the part**, so an assembly is not permanently inside a cage
   of lines. Turn `onlyWhenNear` off on DimensionOverlay to have them always on.
-- Both panels can be **dragged** wherever you want them. The controls panel is
-  dragged by the **Holo-CAD strip along its top**, because its face is covered
-  in buttons and a pinch there presses one.
+- Both panels can be **dragged** from anywhere on them, buttons included. A
+  pinch that moves the panel is a drag; a pinch that stays put is a press.
 
 Parts arrive in the colours FreeCAD gives them, one colour per body, taken
 from the object's Shape colour. A multi body document keeps its shape: every
@@ -203,8 +202,6 @@ otherwise hard to undo once a part is somewhere you cannot reach:
 | **Bring to me** | Everything back in front of you, sizes left alone. |
 | **Reset all** | Both of the above, plus rotation. |
 | **Grab: parts / whole** | Whether a grab moves one part or the whole assembly. |
-
-Drag the panel by the **Holo-CAD strip at the top**, not by its face.
 
 **Grab: whole** is what to use for an assembly you want to position as one
 piece. Only one of the two modes is live at a time, because a grabbable
@@ -287,7 +284,16 @@ The lens compares sorted dimensions and warns past 3%, which catches a dropped
 placement without firing on the Z-up to Y-up axis swap or on the few percent
 that tessellating a tiny sphere into flat facets costs.
 
-Two things the addon does so that the measurement can be trusted.
+The addon states the file's units outright, and the lens uses that in
+preference to measuring. Measuring the loaded mesh turned out not to be
+trustworthy: across a real 21 part assembly the measured box came out two to
+five times too large for most parts, giving corrections between 21 and 39
+where every one should be 100, so each part was scaled by a wrong factor of
+its own and the assembly fell apart. The exporter writes metres and says so,
+which is exact and the same for every part. The measurement is kept as a
+cross check and warns when the two disagree by more than half.
+
+Two more things the addon does so that the size can be trusted.
 
 It reports the **tight** bounding box, from `optimalBoundingBox`, not
 `Shape.BoundBox`. The latter is only an estimate for curved geometry and can
@@ -349,7 +355,7 @@ bridge/, relay/                      development harness, not shipped
 .\tools\run_tests.ps1
 ```
 
-203 checks in seven suites. The first five run on FreeCAD's own Python with
+212 checks in seven suites. The first five run on FreeCAD's own Python with
 nothing installed, which is the interpreter the addon actually runs on, so a
 pass there means a pass where it matters.
 

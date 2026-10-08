@@ -211,6 +211,7 @@ def send(objs=None, doc=None, force=False) -> list:
             triangles=result["triangles"],
             colours=result.get("colours"),
             offset_mm=result.get("offset_mm"),
+            cm_per_unit=result.get("cm_per_unit"),
         )
         _digests[metadata["id"]] = digest
         sent.append(metadata)
@@ -225,6 +226,7 @@ def send(objs=None, doc=None, force=False) -> list:
                 "triangles": metadata["triangles"],
                 "colours": metadata["colours"],
                 "offset_mm": metadata["offset_mm"],
+                "cm_per_unit": metadata["cm_per_unit"],
             })
         bbox = result["bbox_mm"]
         log(

@@ -31,6 +31,7 @@
     loaderObject: false
     placementObject: false
     spacingCm: false
+    tapSlopCm: false
     title: false
     vertical: false
   ScriptTypesHidden:
@@ -49,6 +50,7 @@
       buttonWidthCm: !<float> 20.000000
       spacingCm: 1.500000
       vertical: true
+      tapSlopCm: 1.500000
   ScriptTypes:
     -
       {}
@@ -60,3 +62,4 @@
     - '// @input float buttonWidthCm = 20 {"hint":"Width of one button, in cm."}'
     - '// @input float spacingCm = 1.5 {"hint":"Gap between buttons, in cm."}'
     - '// @input bool vertical = true {"hint":"Stack the buttons vertically rather than in a row."}'
+    - '// @input float tapSlopCm = 1.5 {"hint":"How far the panel may move during a pinch and still count as a button press, in cm."}'
