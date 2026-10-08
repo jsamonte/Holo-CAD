@@ -31,6 +31,8 @@
     dropCm: false
     faceUser: false
     grabbable: false
+    handleHeightCm: false
+    handleObject: false
     heightCm: false
     widthCm: false
   ScriptTypesHidden:
@@ -46,8 +48,10 @@
       dropCm: !<float> 18.000000
       widthCm: !<float> 46.000000
       heightCm: !<float> 22.000000
+      handleHeightCm: !<float> 5.000000
       grabbable: true
       faceUser: true
+      handleObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     -
@@ -57,6 +61,8 @@
     - '// @input float dropCm = 18 {"hint":"How far below eye level it starts, in cm. Negative puts it above."}'
     - '// @input float widthCm = 46 {"hint":"Width of the grab area, in cm."}'
     - '// @input float heightCm = 22 {"hint":"Height of the grab area, in cm."}'
+    - '// @input float handleHeightCm = 5 {"hint":"Height of the handle strip, in cm, when the panel has one."}'
     - '// @input bool grabbable = true {"hint":"Let the panel be grabbed and moved."}'
     - '// @input bool faceUser = true {"hint":"Keep the panel turned towards you as you move around it."}'
+    - '// @input SceneObject handleObject {"hint":"Grab here instead of anywhere on the panel. Leave empty to use the whole panel."}'
     - '// @input SceneObject cameraObject {"hint":"Camera to place in front of. Leave empty to find the main camera."}'

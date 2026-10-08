@@ -6,6 +6,7 @@
     - !<own> 5aa0f98b-e799-448c-a2dc-cae5d04fa2a4
     - !<own> 827b8617-0291-434e-a9da-b637e42b2c49
     - !<own> 868ee4cf-1754-41fb-8db5-622b31233581
+    - !<own> bba479b6-b315-4f10-b91f-ed8ac720fac2
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       []
@@ -229,8 +230,10 @@
     dropCm: true
     widthCm: true
     heightCm: true
+    handleHeightCm: true
     grabbable: true
     faceUser: true
+    handleObject: true
     cameraObject: true
   ScriptTypesDefault:
     {}
@@ -240,8 +243,10 @@
       dropCm: !<float> 18.000000
       widthCm: !<float> 46.000000
       heightCm: !<float> 22.000000
+      handleHeightCm: !<float> 5.000000
       grabbable: true
       faceUser: true
+      handleObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
@@ -325,7 +330,7 @@
     "":
       internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
       remoteMediaModule: !<reference.RemoteMediaModule> 5585ebf2-64c6-44eb-832c-690bbb357032
-      material: !<reference.Material> c69ebc19-cdbb-4195-bcc6-4029941362d0
+      material: !<reference.Material> 115ea5c5-6333-42a4-86f8-e037523b226b
       bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       modelsParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
@@ -708,6 +713,32 @@
     - !<own> b6967747-d54d-4fdf-b8cc-652d7e6080ba
   Components:
     []
+- !<ScriptComponent/313877e9-d1e8-4040-9db2-63554c7eb586>
+  PrefabRemaps:
+    []
+  Name: ControlPanel
+  Enabled: true
+  ScriptAsset: !<reference> 21d62d9d-eca5-4a2d-a5e5-ee86ea8fc4b4
+  ScriptInputsDefault:
+    title: true
+    buttonHeightCm: true
+    buttonWidthCm: true
+    spacingCm: true
+    vertical: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      placementObject: !<reference.SceneObject> 827b8617-0291-434e-a9da-b637e42b2c49
+      loaderObject: !<reference.SceneObject> 827b8617-0291-434e-a9da-b637e42b2c49
+      title: Holo-CAD
+      buttonHeightCm: !<float> 4.000000
+      buttonWidthCm: !<float> 20.000000
+      spacingCm: 1.500000
+      vertical: true
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/319c29db-cd9c-448c-8028-20ef49b55a70>
   PrefabRemaps:
     []
@@ -774,6 +805,7 @@
     allowManipulation: true
     allowResize: true
     grabPaddingCm: true
+    grabWhole: true
     minScale: true
     maxScale: true
   ScriptTypesDefault:
@@ -784,6 +816,7 @@
       allowManipulation: true
       allowResize: true
       grabPaddingCm: !<float> 2.000000
+      grabWhole: false
       minScale: 0.050000
       maxScale: !<float> 20.000000
   ScriptTypes:
@@ -1129,6 +1162,7 @@
   ScriptAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
   ScriptInputsDefault:
     modelLoaderObject: true
+    onlyWhenNear: true
     labelSizeCm: true
     cameraObject: true
   ScriptTypesDefault:
@@ -1138,6 +1172,7 @@
       modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       lineMaterial: !<reference.Material> b7f284bd-a00a-4139-bdbe-edc53aad64ec
       visibleAtStart: true
+      onlyWhenNear: true
       labelSizeCm: !<float> 2.000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
@@ -1995,6 +2030,34 @@
     - !<own> f0e33766-c981-4f7a-b17b-a50e70c8b6bc
   Components:
     []
+- !<ScriptComponent/a3e451a2-5731-4257-9d8b-ff7e0767ab93>
+  PrefabRemaps:
+    []
+  Name: FloatingPanel
+  Enabled: true
+  ScriptAsset: !<reference> 8b56a139-b7d2-49a7-a9d3-06ea8c3ccf7a
+  ScriptInputsDefault:
+    handleHeightCm: true
+    grabbable: true
+    faceUser: true
+    handleObject: true
+    cameraObject: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      distanceCm: !<float> 60.000000
+      dropCm: !<float> 0.000000
+      widthCm: !<float> 24.000000
+      heightCm: !<float> 26.000000
+      handleHeightCm: !<float> 5.000000
+      grabbable: true
+      faceUser: true
+      handleObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/a4be667c-356e-4cf4-81ef-21e3e55cb1c2>
   PrefabRemaps:
     []
@@ -2036,6 +2099,7 @@
     askAtStart: true
     remember: true
     takeOver: true
+    words: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -2045,7 +2109,7 @@
       askAtStart: true
       remember: true
       takeOver: true
-      words: declaration-disciplines-removing-lab
+      words: ""
   ScriptTypes:
     "":
       {}
@@ -2423,6 +2487,22 @@
     - !<own> ed7074f4-802d-4336-9588-237c5c48f33e
   Components:
     []
+- !<SceneObject/bba479b6-b315-4f10-b91f-ed8ac720fac2>
+  PrefabRemaps:
+    []
+  Name: HoloCAD Controls
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: -45.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> a3e451a2-5731-4257-9d8b-ff7e0767ab93
+    - !<own> 313877e9-d1e8-4040-9db2-63554c7eb586
 - !<SceneObject/c13a2c2f-e234-4d39-a4f9-4102a018efc8>
   PrefabRemaps:
     []
