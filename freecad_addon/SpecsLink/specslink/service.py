@@ -202,6 +202,7 @@ def send(objs=None, doc=None, force=False) -> list:
             result["bbox_mm"],
             scale=scale,
             triangles=result["triangles"],
+            colours=result.get("colours"),
         )
         _digests[metadata["id"]] = digest
         sent.append(metadata)
@@ -214,6 +215,7 @@ def send(objs=None, doc=None, force=False) -> list:
                 "bbox_mm": metadata["bbox_mm"],
                 "scale": metadata["scale"],
                 "triangles": metadata["triangles"],
+                "colours": metadata["colours"],
             })
         bbox = result["bbox_mm"]
         log(

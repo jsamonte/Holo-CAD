@@ -1,0 +1,56 @@
+- !<AssetImportMetadata/0012bb18-fc85-4b37-aa68-5f2b2486d0d4>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 21d62d9d-eca5-4a2d-a5e5-ee86ea8fc4b4
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 21d62d9d-eca5-4a2d-a5e5-ee86ea8fc4b4
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 25493983-51e7-483c-8409-f16d22856afd
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/25493983-51e7-483c-8409-f16d22856afd>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: eb98ad66-db90-4d31-b731-182fee1fd0ba
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    buttonHeightCm: false
+    loaderObject: false
+    placementObject: false
+    title: false
+    vertical: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - placementObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      loaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      title: Holo-CAD
+      buttonHeightCm: !<float> 4.000000
+      vertical: true
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input SceneObject placementObject {"hint":"Object holding ModelPlacement. Leave empty to search the scene."}'
+    - '// @input SceneObject loaderObject {"hint":"Object holding ModelLoader. Leave empty to search the scene."}'
+    - '// @input string title = "Holo-CAD" {"hint":"Optional heading above the buttons. Leave blank for none."}'
+    - '// @input float buttonHeightCm = 4 {"hint":"Height of one button, in cm. Also sets the text size."}'
+    - '// @input bool vertical = true {"hint":"Stack the buttons vertically rather than in a row."}'

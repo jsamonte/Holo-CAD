@@ -33,6 +33,15 @@ export type ModelUpdate = {
   bbox_mm: BboxMm
   scale: ScaleSpec
   triangles: number
+  /**
+   * One [r, g, b, a] per mesh, in the order the meshes appear in the GLB.
+   *
+   * The GLB already carries these as baseColorFactor, but Lens Studio
+   * instantiates glTF against a single template material and the file's own
+   * colours did not survive that, so the lens tints the meshes from this
+   * list instead. Empty means leave the template material alone.
+   */
+  colours: number[][]
   pushed_ms?: number
   bytes?: number
   /** Seconds on the lens clock when this message arrived. */
@@ -385,10 +394,42 @@ export class BridgeClient extends BaseScriptComponent {
         target_mm: typeof scale.target_mm === "number" ? scale.target_mm : null
       },
       triangles: Number(raw.triangles) || 0,
+      colours: BridgeClient.parseColours(raw.colours),
       pushed_ms: typeof raw.pushed_ms === "number" ? raw.pushed_ms : undefined,
       bytes: typeof raw.bytes === "number" ? raw.bytes : undefined,
       receivedAt: getTime()
     }
+  }
+
+  /**
+   * Colours as [r, g, b, a] rows, dropping the whole list if any row is
+   * unusable.
+   *
+   * All or nothing on purpose: tinting some meshes and leaving the rest on
+   * the template material looks like a rendering bug rather than bad input,
+   * and an older addon that sends no colours at all is a case to support.
+   */
+  private static parseColours(raw: any): number[][] {
+    if (!Array.isArray(raw)) {
+      return []
+    }
+    const out: number[][] = []
+    for (let i = 0; i < raw.length; i++) {
+      const row = raw[i]
+      if (!Array.isArray(row) || row.length < 3) {
+        return []
+      }
+      const rgba: number[] = []
+      for (let c = 0; c < 4; c++) {
+        const value = c < row.length ? Number(row[c]) : 1
+        if (!isFinite(value)) {
+          return []
+        }
+        rgba.push(Math.min(1, Math.max(0, value)))
+      }
+      out.push(rgba)
+    }
+    return out
   }
 
   private setStatus(state: BridgeState, detail: string): void {

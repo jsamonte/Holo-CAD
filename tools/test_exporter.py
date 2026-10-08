@@ -247,6 +247,35 @@ def main() -> int:
           all(close(v, 100.0, 0.5) for v in curved["bbox_mm"]),
           str(curved["bbox_mm"]))
 
+    print("colours are reported beside the model, and land in the GLB")
+    # Headless there is no ViewObject, so object_colour falls back to its
+    # default. That is the case worth pinning anyway: the lens must get a
+    # usable colour per mesh whether or not FreeCAD had a GUI.
+    two = exporter.export([box, sphere])
+    check("one colour per exported object",
+          len(two["colours"]) == 2, str(two["colours"]))
+    check("each colour is rgba",
+          all(len(c) == 4 for c in two["colours"]), str(two["colours"]))
+    check("each channel is within 0 to 1",
+          all(0.0 <= v <= 1.0 for c in two["colours"] for v in c),
+          str(two["colours"]))
+
+    single = exporter.export([box])
+    check("one object reports one colour",
+          len(single["colours"]) == 1, str(single["colours"]))
+
+    gltf_two, _ = read_glb(two["glb"])
+    factors = [
+        m["pbrMetallicRoughness"]["baseColorFactor"]
+        for m in gltf_two.get("materials", [])
+    ]
+    check("the GLB carries a material per mesh",
+          len(factors) == 2, str(factors))
+    check("the reported colours match the GLB's own baseColorFactor",
+          all(all(close(a, b, 1e-5) for a, b in zip(reported, written))
+              for reported, written in zip(two["colours"], factors)),
+          "{0} vs {1}".format(two["colours"], factors))
+
     FreeCAD.closeDocument(doc.Name)
     FreeCAD.closeDocument(empty_doc.Name)
 

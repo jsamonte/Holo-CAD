@@ -76,10 +76,21 @@ def main() -> int:
         check("scale is 1:1 by default", metadata["scale"]["mode"] == "true_size")
         check("triangle count present", metadata["triangles"] == 12,
               str(metadata["triangles"]))
+        # The lens tints the meshes from this rather than from the GLB,
+        # because Lens Studio instantiates glTF against one template
+        # material and dropped the file's own colours.
+        check("a colour per object goes out with the model",
+              len(metadata["colours"]) == 1, str(metadata["colours"]))
+        check("the colour is rgba in 0 to 1",
+              len(metadata["colours"][0]) == 4
+              and all(0.0 <= v <= 1.0 for v in metadata["colours"][0]),
+              str(metadata["colours"]))
 
         update = client.read_json()
         check("the lens was told", update.get("type") == "model_update")
         check("same version as the publish", update["version"] == metadata["version"])
+        check("and told the colour", update["colours"] == metadata["colours"],
+              str(update.get("colours")))
 
         with urllib.request.urlopen(
                 update["url"].replace(service.bridge().host_ip, "127.0.0.1"),

@@ -179,8 +179,28 @@ assembly, and deleting one removes it from the glasses.
 - **Pinch with both hands** and pull apart or together to resize, from 0.05x
   to 20x.
 - The size label under the model updates as you scale. **Tap the label** to
-  snap back to true 1:1.
-- The status panel can be **dragged** wherever you want it.
+  snap back to true 1:1, for that one part.
+- Both panels can be **dragged** wherever you want them.
+
+Parts arrive in the colours FreeCAD gives them, one colour per body, taken
+from the object's Shape colour.
+
+### The controls panel
+
+A second draggable panel carries four buttons, for the things that are
+otherwise hard to undo once a part is somewhere you cannot reach:
+
+| Button | What it does |
+| --- | --- |
+| **Reset size** | Every part back to true size, the assembly included. |
+| **Bring to me** | Everything back in front of you, sizes left alone. |
+| **Reset all** | Both of the above, plus rotation. |
+| **Grab: parts / whole** | Whether a grab moves one part or the whole assembly. |
+
+**Grab: whole** is what to use for an assembly you want to position as one
+piece. Only one of the two modes is live at a time, because a grabbable
+assembly wrapped around grabbable parts makes a pinch ambiguous, and you
+would reach for the assembly and move one bracket instead.
 
 ### Scale modes
 
@@ -290,7 +310,8 @@ Spectacles/Holo-CAD/                 the Lens Studio project
   Assets/Scripts/ModelPlacement.ts   grab to move, two-handed pinch to resize
   Assets/Scripts/DimensionOverlay.ts the size label, and the reset control
   Assets/Scripts/TunnelPairing.ts    asks for the four words, remembers them
-  Assets/Scripts/FloatingPanel.ts    makes the status panel draggable
+  Assets/Scripts/FloatingPanel.ts    makes a panel world placed and draggable
+  Assets/Scripts/ControlPanel.ts     the reset and grab mode buttons
   Assets/Scripts/StatusPanel.ts      connection and model status
 docs/LENS_SETUP.md                   the lens side in detail
 docs/PUBLISHING.md                   the Lens Explorer checklist
@@ -305,7 +326,7 @@ bridge/, relay/                      development harness, not shipped
 .\tools\run_tests.ps1
 ```
 
-168 checks in seven suites. The first five run on FreeCAD's own Python with
+187 checks in seven suites. The first five run on FreeCAD's own Python with
 nothing installed, which is the interpreter the addon actually runs on, so a
 pass there means a pass where it matters.
 

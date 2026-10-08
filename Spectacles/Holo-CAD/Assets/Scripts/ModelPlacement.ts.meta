@@ -29,6 +29,7 @@
     allowManipulation: false
     allowResize: false
     grabPaddingCm: false
+    grabWhole: false
     maxScale: false
     minScale: false
     modelLoaderObject: false
@@ -45,6 +46,7 @@
       allowManipulation: true
       allowResize: true
       grabPaddingCm: !<float> 2.000000
+      grabWhole: false
       minScale: 0.050000
       maxScale: !<float> 20.000000
   ScriptTypes:
@@ -55,5 +57,6 @@
     - '// @input bool allowManipulation = true {"hint":"Let the model be grabbed, moved and turned."}'
     - '// @input bool allowResize = true {"hint":"Two handed pinch to resize. Reset size puts it back to 1:1."}'
     - '// @input float grabPaddingCm = 2 {"hint":"Padding added to the grab box, in cm, so thin parts stay catchable."}'
+    - '// @input bool grabWhole {"hint":"Start out grabbing the whole assembly as one piece rather than single parts."}'
     - '// @input float minScale = 0.05 {"hint":"Smallest you can shrink to, as a fraction of true size."}'
     - '// @input float maxScale = 20 {"hint":"Largest you can grow to, as a multiple of true size."}'

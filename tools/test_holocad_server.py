@@ -113,6 +113,50 @@ def main() -> int:
     check("RFC 6455 test vector", accept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
           "got {0}".format(accept))
 
+    print("closing a peer whose socket has already gone is not an error")
+    # Shutting the server down races the peer threads. A finished peer has a
+    # closed wfile, and writing to that raises ValueError rather than
+    # OSError, which escaped send_close and broke FreeCAD's shutdown.
+    class _DeadFile(object):
+        def write(self, data):
+            raise ValueError("I/O operation on closed file.")
+
+        def flush(self):
+            raise ValueError("I/O operation on closed file.")
+
+    class _DeadHandler(object):
+        wfile = _DeadFile()
+
+    dead = hs.WebSocketPeer(_DeadHandler(), "")
+    try:
+        dead.send_close()
+        check("send_close survives a closed socket", True)
+    except Exception as e:
+        check("send_close survives a closed socket", False,
+              "{0}: {1}".format(type(e).__name__, e))
+    dead.closed = False
+    check("send reports the peer as gone rather than raising",
+          dead.send_text("{}") is False)
+    check("and marks it closed", dead.closed is True)
+
+    print("colours are cleaned before they go out")
+    check("a plain rgba list survives",
+          hs._clean_colours([[0.1, 0.2, 0.3, 1.0]]) == [[0.1, 0.2, 0.3, 1.0]])
+    check("rgb gains a full alpha",
+          hs._clean_colours([[0.1, 0.2, 0.3]]) == [[0.1, 0.2, 0.3, 1.0]])
+    check("out of range channels are clamped",
+          hs._clean_colours([[-1.0, 2.0, 0.5, 0.5]]) == [[0.0, 1.0, 0.5, 0.5]])
+    check("tuples become lists, so the result is JSON serialisable",
+          hs._clean_colours([(0.5, 0.5, 0.5, 1.0)]) == [[0.5, 0.5, 0.5, 1.0]])
+    # All or nothing: a half valid list would tint some meshes and leave the
+    # rest on the template material, which reads as a rendering bug.
+    check("one bad row drops the whole list",
+          hs._clean_colours([[0.1, 0.2, 0.3], ["x", "y", "z"]]) == [])
+    check("a short row drops the whole list",
+          hs._clean_colours([[0.1, 0.2]]) == [])
+    check("no colours is an empty list, not None",
+          hs._clean_colours(None) == [])
+
     print("model urls follow the address each lens arrived on")
     # The bug this guards: FreeCAD served a LAN url while the lens had
     # reached it through a tunnel, so every model announcement pointed at

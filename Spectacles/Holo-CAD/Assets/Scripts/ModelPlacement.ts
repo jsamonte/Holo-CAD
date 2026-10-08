@@ -22,6 +22,7 @@ import {ModelLoader, ShownModel} from "./ModelLoader"
 
 const TAG = "HoloCAD ModelPlacement"
 const GRAB_BOX = "holocad_grab_box"
+const ASSEMBLY_BOX = "holocad_assembly_box"
 
 /** How big a model is right now, relative to the size FreeCAD reported. */
 export type UserScale = {
@@ -52,6 +53,10 @@ export class ModelPlacement extends BaseScriptComponent {
   grabPaddingCm: number = 2
 
   @input
+  @hint("Start out grabbing the whole assembly as one piece rather than single parts.")
+  grabWhole: boolean = false
+
+  @input
   @hint("Smallest you can shrink to, as a fraction of true size.")
   minScale: number = 0.05
 
@@ -65,9 +70,15 @@ export class ModelPlacement extends BaseScriptComponent {
    */
   readonly onUserScaleChanged = new Signal<UserScale>()
 
+  /** Fired when the grab target changes, with true for the whole assembly. */
+  readonly onGrabModeChanged = new Signal<boolean>()
+
   private loader: ModelLoader | null = null
   private wired: Map<string, InteractableManipulation> = new Map()
+  private parts: Map<string, Interactable> = new Map()
   private shown: Map<string, ShownModel> = new Map()
+  private assemblyGrab: InteractableManipulation | null = null
+  private assemblyInteractable: Interactable | null = null
 
   onAwake(): void {
     this.createEvent("OnStartEvent").bind(() => this.start())
@@ -83,9 +94,12 @@ export class ModelPlacement extends BaseScriptComponent {
     this.loader.onModelShown.add((shown) => this.onModelShown(shown))
     this.loader.onModelRemoved.add((id) => {
       this.wired.delete(id)
+      this.parts.delete(id)
       this.shown.delete(id)
+      this.fitAssemblyCollider()
     })
-    print(`${TAG}: ready`)
+    this.applyGrabMode()
+    print(`${TAG}: ready, grabbing ${this.grabWhole ? "the whole assembly" : "single parts"}`)
   }
 
   private onModelShown(shown: ShownModel): void {
@@ -97,9 +111,11 @@ export class ModelPlacement extends BaseScriptComponent {
     if (existing !== undefined) {
       // Already grabbable. Only the collider needs to follow the new size.
       this.fitCollider(shown)
-      return
+    } else {
+      this.makeGrabbable(shown)
     }
-    this.makeGrabbable(shown)
+    this.fitAssemblyCollider()
+    this.applyGrabMode()
   }
 
   private makeGrabbable(shown: ShownModel): void {
@@ -124,6 +140,7 @@ export class ModelPlacement extends BaseScriptComponent {
     manipulation.onScaleEnd.add(() => this.reportScale(shown.id))
 
     this.wired.set(shown.id, manipulation)
+    this.parts.set(shown.id, interactable)
     print(
       `${TAG}: ${shown.id} can be grabbed and turned` +
         (this.allowResize ? ", and resized with two hands" : "")
@@ -233,6 +250,196 @@ export class ModelPlacement extends BaseScriptComponent {
   setAllowResize(enabled: boolean): void {
     this.allowResize = enabled
     this.wired.forEach((manipulation) => manipulation.setCanScale(enabled))
+    if (this.assemblyGrab !== null) {
+      this.assemblyGrab.setCanScale(enabled)
+    }
     print(`${TAG}: resizing ${enabled ? "on" : "off"}`)
+  }
+
+  // ---- grabbing the whole assembly ---------------------------------------
+
+  /**
+   * Choose between dragging single parts and dragging the lot.
+   *
+   * Only one of the two is ever live. Nesting a grabbable assembly around
+   * grabbable parts means a pinch is ambiguous, and SIK resolves that by
+   * picking whichever collider the ray hits first, which from most angles
+   * is the part. You would reach for the assembly and move one bracket.
+   * So the unused side is switched off rather than left to compete.
+   */
+  setGrabWhole(whole: boolean): void {
+    this.grabWhole = whole
+    this.applyGrabMode()
+    print(`${TAG}: grabbing ${whole ? "the whole assembly" : "single parts"}`)
+    this.onGrabModeChanged.emit(whole)
+  }
+
+  /** Flip between whole assembly and single parts. Wire this to a button. */
+  toggleGrabWhole(): void {
+    this.setGrabWhole(!this.grabWhole)
+  }
+
+  /** True when a grab moves the whole assembly. */
+  grabbingWhole(): boolean {
+    return this.grabWhole
+  }
+
+  private applyGrabMode(): void {
+    if (!this.allowManipulation) {
+      return
+    }
+    if (this.grabWhole) {
+      this.ensureAssemblyGrab()
+    }
+    const parts = !this.grabWhole
+    this.parts.forEach((interactable) => {
+      interactable.enabled = parts
+    })
+    if (this.assemblyInteractable !== null) {
+      this.assemblyInteractable.enabled = this.grabWhole
+    }
+  }
+
+  private ensureAssemblyGrab(): void {
+    if (this.assemblyGrab !== null || this.loader === null) {
+      return
+    }
+    const root = this.loader.assemblyRoot()
+    this.fitAssemblyCollider()
+    this.assemblyInteractable = root.createComponent(Interactable.getTypeName())
+    const manipulation = root.createComponent(InteractableManipulation.getTypeName())
+    manipulation.setCanTranslate(true)
+    manipulation.setCanRotate(true)
+    manipulation.setCanScale(this.allowResize)
+    manipulation.minimumScaleFactor = this.minScale
+    manipulation.maximumScaleFactor = this.maxScale
+    this.assemblyGrab = manipulation
+  }
+
+  /**
+   * Size one box around every model, in assembly space.
+   *
+   * Rotation of the individual parts is ignored and made up for with
+   * padding. A tight box would mean recomputing an oriented hull every time
+   * a part is turned, for a grab target that only has to be easy to reach.
+   */
+  private fitAssemblyCollider(): void {
+    if (this.loader === null || this.shown.size === 0) {
+      return
+    }
+    const root = this.loader.assemblyRoot()
+    let minX = Infinity, minY = Infinity, minZ = Infinity
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity
+
+    this.shown.forEach((shown) => {
+      const transform = shown.root.getTransform()
+      const at = transform.getLocalPosition()
+      const factor = transform.getLocalScale().x
+      // shownMm is the rendered size in mm, Lens Studio works in cm, and
+      // the model sits on its root rather than being centred on it.
+      const halfX = (shown.shownMm.x * factor) / 20
+      const halfZ = (shown.shownMm.z * factor) / 20
+      const height = (shown.shownMm.y * factor) / 10
+      minX = Math.min(minX, at.x - halfX)
+      maxX = Math.max(maxX, at.x + halfX)
+      minY = Math.min(minY, at.y)
+      maxY = Math.max(maxY, at.y + height)
+      minZ = Math.min(minZ, at.z - halfZ)
+      maxZ = Math.max(maxZ, at.z + halfZ)
+    })
+    if (!isFinite(minX) || !isFinite(maxX)) {
+      return
+    }
+
+    let holder = ModelPlacement.childNamed(root, ASSEMBLY_BOX)
+    if (holder === null) {
+      holder = global.scene.createSceneObject(ASSEMBLY_BOX)
+      holder.setParent(root)
+    }
+    holder.getTransform().setLocalPosition(
+      new vec3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2)
+    )
+
+    let collider = holder.getComponent("Physics.ColliderComponent")
+    if (collider === null || collider === undefined) {
+      collider = holder.createComponent("Physics.ColliderComponent")
+      collider.debugDrawEnabled = false
+    }
+    const padding = Math.max(0, this.grabPaddingCm)
+    const box = Shape.createBoxShape()
+    box.size = new vec3(
+      maxX - minX + padding,
+      maxY - minY + padding,
+      maxZ - minZ + padding
+    )
+    collider.shape = box
+  }
+
+  private static childNamed(parent: SceneObject, name: string): SceneObject | null {
+    for (let i = 0; i < parent.getChildrenCount(); i++) {
+      const child = parent.getChild(i)
+      if (child.name === name) {
+        return child
+      }
+    }
+    return null
+  }
+
+  // ---- putting everything back -------------------------------------------
+
+  /**
+   * Undo everything the hands have done: size, position and rotation, for
+   * every part and for the assembly.
+   *
+   * This is the way out of having dragged a part somewhere behind you, or
+   * shrunk the assembly to a speck, neither of which was recoverable
+   * before.
+   */
+  resetAll(): void {
+    if (this.loader === null) {
+      return
+    }
+    // Parts first, so the assembly is placed around models that are back
+    // at true size rather than around whatever they had been stretched to.
+    this.shown.forEach((shown) => {
+      const transform = shown.root.getTransform()
+      transform.setLocalRotation(quat.quatIdentity())
+      transform.setLocalScale(new vec3(1, 1, 1))
+    })
+    this.loader.resetAssembly()
+    this.loader.replaceAll()
+    this.shown.forEach((_shown, id) => this.reportScale(id))
+    this.fitAssemblyCollider()
+    print(`${TAG}: size, rotation and position reset on everything`)
+  }
+
+  /**
+   * Bring everything back within reach, without touching its size.
+   *
+   * The assembly's own drag is undone first, otherwise re-placing the parts
+   * inside an assembly that has itself been pushed away would land them
+   * somewhere else again.
+   */
+  resetPosition(): void {
+    if (this.loader === null) {
+      return
+    }
+    this.loader.resetAssemblyPlacement()
+    this.shown.forEach((shown) => {
+      shown.root.getTransform().setLocalRotation(quat.quatIdentity())
+    })
+    this.loader.replaceAll()
+    this.fitAssemblyCollider()
+    print(`${TAG}: everything brought back in front of you`)
+  }
+
+  /** Put every part back to true size, assembly included. */
+  resetSizeAll(): void {
+    if (this.loader !== null) {
+      const transform = this.loader.assemblyRoot().getTransform()
+      transform.setLocalScale(new vec3(1, 1, 1))
+    }
+    this.resetSize()
+    this.fitAssemblyCollider()
   }
 }

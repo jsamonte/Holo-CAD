@@ -443,4 +443,11 @@ def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False) -> dict:
         "bbox_mm": bbox,
         "triangles": triangles,
         "exporter": used,
+        # Also sent beside the model, even though the GLB already carries it
+        # as baseColorFactor. Lens Studio instantiates glTF against one
+        # template material and the file's own colours did not survive that,
+        # so the lens tints each mesh from this list instead of relying on
+        # the importer. In the same order as objs, which is the order
+        # build_glb writes the meshes in.
+        "colours": [[round(c, 6) for c in object_colour(obj)] for obj in objs],
     }

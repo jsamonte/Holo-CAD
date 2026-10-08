@@ -56,6 +56,29 @@ OP_PING = 0x9
 OP_PONG = 0xA
 
 
+def _clean_colours(colours):
+    """Colours as plain [r, g, b, a] floats clamped to 0..1, or [].
+
+    Anything unusable is dropped rather than sent, because a half valid
+    colour list would tint some meshes and leave others on the template
+    material, which looks like a rendering bug rather than bad input.
+    """
+    if not colours:
+        return []
+    out = []
+    for colour in colours:
+        try:
+            values = [float(c) for c in colour]
+        except (TypeError, ValueError):
+            return []
+        if len(values) == 3:
+            values.append(1.0)
+        if len(values) != 4:
+            return []
+        out.append([min(1.0, max(0.0, v)) for v in values])
+    return out
+
+
 def slugify(name) -> str:
     slug = SLUG_RE.sub("-", str(name)).strip("-.")
     return slug[:64] or "model"
@@ -212,7 +235,11 @@ class WebSocketPeer:
                 self.handler.wfile.write(bytes(header) + payload)
                 self.handler.wfile.flush()
                 return True
-            except OSError:
+            except (OSError, ValueError):
+                # ValueError as well as OSError: once the peer's own thread
+                # has finished, wfile is a closed file object and writing to
+                # it raises "I/O operation on closed file", which is not an
+                # OSError and would otherwise escape into FreeCAD.
                 self.closed = True
                 return False
 
@@ -224,7 +251,10 @@ class WebSocketPeer:
             try:
                 self.handler.wfile.write(bytes([0x80 | OP_CLOSE, 0]))
                 self.handler.wfile.flush()
-            except OSError:
+            except (OSError, ValueError):
+                # Saying goodbye to a lens that has already gone is not a
+                # failure. Shutting the server down raced the peer threads
+                # and took the whole of FreeCAD's shutdown with it.
                 pass
 
 
@@ -302,11 +332,15 @@ class Bridge:
 
     # ---- the one call the addon makes ----
 
-    def publish(self, model_id: str, glb: bytes, bbox_mm, scale=None, triangles=0) -> dict:
+    def publish(self, model_id: str, glb: bytes, bbox_mm, scale=None, triangles=0,
+                colours=None) -> dict:
         """Store a GLB and tell every connected lens about it.
 
         bbox_mm is the true size in millimetres, which is what the lens
-        measures against. Returns the metadata that went out.
+        measures against. colours is one [r, g, b, a] per mesh, in the order
+        the meshes appear in the GLB, because the lens tints the meshes
+        itself rather than trusting the importer. Returns the metadata that
+        went out.
         """
         if not glb[:4] == b"glTF":
             raise ValueError("not a GLB, missing the glTF magic")
@@ -331,6 +365,7 @@ class Bridge:
                 "target_mm": scale.get("target_mm"),
             },
             "triangles": int(triangles),
+            "colours": _clean_colours(colours),
             "pushed_ms": int(time.time() * 1000),
             "bytes": len(glb),
         }

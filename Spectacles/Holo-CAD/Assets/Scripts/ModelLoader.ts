@@ -18,15 +18,17 @@
  * Hierarchy per model id:
  *
  *   <models parent>
- *     holocad_<id>          placement, kept across updates
- *       holocad_<id>_v<n>   uniform scale, replaced on every update
- *         pivot             offset that puts the origin at bottom centre
- *           <glTF root>     whatever the file contained
+ *     holocad_assembly      one transform for the whole assembly
+ *       holocad_<id>        placement, kept across updates
+ *         holocad_<id>_v<n> uniform scale, replaced on every update
+ *           pivot           offset that puts the origin at bottom centre
+ *             <glTF root>   whatever the file contained
  */
 
 import {BridgeClient, ModelUpdate, Signal} from "./BridgeClient"
 
 const TAG = "HoloCAD ModelLoader"
+const ASSEMBLY = "holocad_assembly"
 
 /** A measured axis aligned box plus how many meshes went into it. */
 type Measured = {
@@ -120,6 +122,7 @@ export class ModelLoader extends BaseScriptComponent {
   private remoteMedia: RemoteMediaModule | null = null
   private bridge: BridgeClient | null = null
   private entries: Map<string, ModelEntry> = new Map()
+  private assembly: SceneObject | null = null
 
   onAwake(): void {
     this.createEvent("OnStartEvent").bind(() => this.start())
@@ -277,6 +280,9 @@ export class ModelLoader extends BaseScriptComponent {
     pivot.getTransform().setLocalPosition(new vec3(-centre.x, -box.min.y, -centre.z))
     staging.getTransform().setLocalScale(new vec3(finalScale, finalScale, finalScale))
 
+    // Before it is revealed, so a part is never seen in the wrong colour.
+    this.tint(pivot, update)
+
     if (!entry.placed) {
       this.placeInFrontOfUser(entry.root)
       entry.placed = true
@@ -314,6 +320,70 @@ export class ModelLoader extends BaseScriptComponent {
       ratioLabel: ratioLabel,
       loadSeconds: loadSeconds
     })
+  }
+
+  // ---- colour ------------------------------------------------------------
+
+  /**
+   * Give each mesh the colour FreeCAD gave the object it came from.
+   *
+   * The GLB carries these already, as baseColorFactor per material, but
+   * Lens Studio instantiates glTF against the one template material passed
+   * to tryInstantiateAsync and the file's own colours did not come through:
+   * every part arrived in the template's colour. So the addon sends the
+   * colours beside the model and they are applied here.
+   *
+   * Each visual gets its own clone of the template. Without the clone they
+   * would share one material and the last colour set would win for the
+   * whole model, which is the same bug in a different place.
+   */
+  private tint(pivot: SceneObject, update: ModelUpdate): void {
+    const colours = update.colours
+    if (colours === undefined || colours.length === 0) {
+      return
+    }
+    const visuals: any[] = []
+    ModelLoader.collectVisuals(pivot, visuals)
+    if (visuals.length === 0) {
+      return
+    }
+
+    let applied = 0
+    for (let i = 0; i < visuals.length; i++) {
+      // One colour for every mesh when only one was sent, which is the
+      // per-body case and the default. Otherwise mesh order, which is the
+      // order the exporter writes them in.
+      const rgba = colours.length === 1 ? colours[0] : colours[i]
+      if (rgba === undefined) {
+        continue
+      }
+      const colour = new vec4(rgba[0], rgba[1], rgba[2], rgba[3])
+      const visual = visuals[i]
+      try {
+        const material = visual.mainMaterial.clone()
+        material.mainPass.baseColor = colour
+        visual.clearMaterials()
+        visual.addMaterial(material)
+        applied++
+      } catch (e) {
+        print(`${TAG}: could not tint a mesh of ${update.id}: ${e}`)
+        return
+      }
+    }
+    print(
+      `${TAG}: ${update.id} tinted ${applied} of ${visuals.length} mesh(es) ` +
+        `from ${colours.length} colour(s)`
+    )
+  }
+
+  private static collectVisuals(object: SceneObject, into: any[]): void {
+    const found = object.getComponents("Component.RenderMeshVisual")
+    for (let i = 0; i < found.length; i++) {
+      into.push(found[i])
+    }
+    for (let i = 0; i < object.getChildrenCount(); i++) {
+      ModelLoader.collectVisuals(object.getChild(i), into)
+    }
   }
 
   // ---- measurement -------------------------------------------------------
@@ -429,9 +499,8 @@ export class ModelLoader extends BaseScriptComponent {
     if (existing !== undefined) {
       return existing
     }
-    const parent = this.modelsParent ?? this.getSceneObject()
     const root = global.scene.createSceneObject(`holocad_${id}`)
-    root.setParent(parent)
+    root.setParent(this.assemblyRoot())
     const entry: ModelEntry = {
       id: id,
       root: root,
@@ -492,6 +561,57 @@ export class ModelLoader extends BaseScriptComponent {
     this.entries.delete(id)
     print(`${TAG}: removed ${id}`)
     this.onModelRemoved.emit(id)
+  }
+
+  /**
+   * One object every model hangs from, so the whole assembly can be moved
+   * as a piece.
+   *
+   * Deliberately not the models parent itself. That object also carries the
+   * script components and the panels, and grabbing it would drag the status
+   * display around with the parts. This is a dedicated child with nothing
+   * on it but models, created once and never replaced, so a transform put
+   * on it by the hands survives every model update.
+   */
+  assemblyRoot(): SceneObject {
+    if (this.assembly !== null) {
+      return this.assembly
+    }
+    const parent = this.modelsParent ?? this.getSceneObject()
+    const existing = ModelLoader.childNamed(parent, ASSEMBLY)
+    this.assembly = existing ?? global.scene.createSceneObject(ASSEMBLY)
+    if (existing === null) {
+      this.assembly.setParent(parent)
+    }
+    return this.assembly
+  }
+
+  /** Put the assembly transform back to where it started, scale included. */
+  resetAssembly(): void {
+    this.resetAssemblyPlacement()
+    this.assemblyRoot().getTransform().setLocalScale(new vec3(1, 1, 1))
+  }
+
+  /**
+   * Undo where the assembly has been dragged and turned, but not its size.
+   *
+   * Kept apart from resetAssembly so that bringing the parts back within
+   * reach does not also throw away a scale somebody chose on purpose.
+   */
+  resetAssemblyPlacement(): void {
+    const transform = this.assemblyRoot().getTransform()
+    transform.setLocalPosition(vec3.zero())
+    transform.setLocalRotation(quat.quatIdentity())
+  }
+
+  private static childNamed(parent: SceneObject, name: string): SceneObject | null {
+    for (let i = 0; i < parent.getChildrenCount(); i++) {
+      const child = parent.getChild(i)
+      if (child.name === name) {
+        return child
+      }
+    }
+    return null
   }
 
   /** Roots of every model currently loaded, by id. */
