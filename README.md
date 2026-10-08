@@ -3,22 +3,27 @@
 See your FreeCAD model floating in front of you at its real size, on Snapchat
 Spectacles, and watch it update while you edit.
 
-One inch in FreeCAD is one inch on the glasses. The lens measures the model
-rather than trusting the units in the file, so a 25.4 mm cube draws 25.4 mm
-across and you can hold a ruler up to it.
+One inch in FreeCAD is one inch on the glasses. The addon reports the part's
+true size and the exact units it wrote, so a 25.4 mm cube draws 25.4 mm across
+and you can hold a ruler up to it. A multi body document keeps its shape:
+parts arrive in their own colours, in the right places, relative to each
+other.
 
-**Two things to install: this FreeCAD addon, and this lens.** The addon is the
-server. It runs inside FreeCAD on your own machine using only FreeCAD's
-bundled Python, so there is no separate program, no virtual environment and
-nothing to pip install.
+**The addon is the server.** It runs inside FreeCAD on your own machine using
+only FreeCAD's bundled Python, so there is nothing to host, no separate
+program, no virtual environment and nothing to pip install. Your model never
+leaves your machine unless you open a tunnel yourself.
+
+Two downloads: this FreeCAD addon and this lens. Plus cloudflared if you take
+the tunnel route below, which is one `winget install` and is worth it.
 
 ```
 FreeCAD + the Holo-CAD addon                      your Spectacles
-  tessellate to GLB                               connect, listen
-  serve it from FreeCAD itself   <------------>   download, measure, show at 1:1
+  tessellate to GLB, per body                     connect, listen
+  serve it from FreeCAD itself   <------------>   download, place, show at 1:1
 ```
 
-Proven end to end on real glasses on 2026-10-07.
+Proven end to end on real glasses, on a 21 part assembly, 2026-10-08.
 
 ## Before you start
 
@@ -239,6 +244,20 @@ from earlier. Close it, or change the port in **Settings**. The addon refuses
 to share the port rather than quietly starting a second server that gets none
 of the traffic, which is a far more confusing failure.
 
+**Everything is grey.** The lens tints each mesh by cloning ModelLoader's
+template material and setting its base colour, so the template has to have
+one. The project's own `HoloCAD Part Material` is built from Lens Studio's
+glTF preset, whose input is `baseColorFactor`. The Spectacles template's
+textured PBR material has no colour input at all, and assigning one does
+nothing and reports nothing. The lens says so in the Logger when it cannot
+tint, so check there first.
+
+**You changed the addon and nothing changed.** FreeCAD imports a Python
+module once and keeps it for the life of the process, so **restart FreeCAD**
+after updating the addon. Reloading does not reliably shake it loose, and the
+symptom is the old behaviour with the new code on disk, which is as
+confusing as it sounds.
+
 **`every object tessellated to nothing`.** Everything picked for export turned
 out to have no surface. Select the bodies you actually want and send again.
 With nothing selected the addon skips sketches, datum planes, datum points and
@@ -265,60 +284,74 @@ missing from the workbench dropdown while every other addon loads fine.
 This is the part worth understanding, because it is what makes the model
 trustworthy.
 
-FreeCAD works in millimetres internally whatever display units you have set.
-glTF declares metres. Lens Studio works in centimetres. Rather than convert
-through that chain and hope, the lens **measures** the model: it instantiates
-with unit conversion off, takes the combined bounding box of every mesh, and
-derives a correction from the true size the addon sent alongside it.
+Three different units are in play. FreeCAD works in millimetres internally
+whatever display units you have set. glTF declares metres. Lens Studio works
+in centimetres.
 
-For a 100 mm cube the correction comes out at exactly 100, and that is right,
-because glTF says metres while Lens Studio counts centimetres. Here is the
-lens's own log from the first time it came out:
+**The addon states the conversion rather than leaving the lens to infer it.**
+It wrote the file, so it knows: it writes metres, which makes one file unit
+100 Lens Studio units, and it sends that number alongside every model. The
+figure is tied to the conversion constant in the exporter, so the two cannot
+drift apart. It is also identical for every part, which matters more than it
+sounds: a part scaled by a factor of its own looks both the wrong size and in
+the wrong place, and an assembly of them falls apart.
+
+**The addon also reports the true size, from the tight bounding box.**
+`optimalBoundingBox` measures the triangulation. `Shape.BoundBox` is only an
+estimate for curved geometry and can be a wild one: a mask built from three
+trimmed spherical faces reported 78.6 x 103.9 x 141.0 mm when the part is
+really 31.4 x 53.3 x 54.7. That size is what the rendered geometry, the
+wireframe box and the grab collider are all built from.
+
+**And each part's mesh is written about that part's own bottom centre**, with
+its position sent separately, relative to the bottom centre of the whole
+send. That is what lets the lens rebuild an assembly in the right shape while
+still updating one part at a time.
+
+The lens still measures the mesh it loaded, but only to check the arithmetic,
+warning when the measurement and the stated scale disagree by more than half.
+It measures as its own fallback too, for an exporter that cannot say what it
+wrote, and then compares sorted dimensions and warns past 3%.
+
+Why the measurement is not in charge any more: it was, and it was wrong. On a
+real 21 part assembly the measured box came out two to five times too large
+for most parts, giving corrections of 21.6, 22.3, 25.1, 31.7, 32.6 and 39.3
+where every one should be 100, while other parts in the same document were
+exactly right. Lens Studio's `localAabb` does not report what the glTF
+accessors say, and the difference is not a constant that can be corrected
+for. Two separate faults were tangled up in it: a measured box that also
+contains the origin, which is why centring the meshes fixed some parts and
+not others.
+
+Here is the lens's own report, from the document that found all of this:
 
 ```
-HoloCAD ModelLoader: test_cube v12 shown at 1:1  size 100.0 x 100.0 x 100.0 mm
-    (true 100.0 x 100.0 x 100.0 mm)  correction 100.0000  meshes 1  load 303 ms
+Body       correction 100.0000   at (1.51, 6.14, 0.56) cm
+EyeL       correction  99.9999   at (6.46, 16.78, -1.00) cm
+EyeR       correction 100.0000   at (6.46, 16.78, 2.11) cm
+Leaf1      correction 100.0019   at (4.62, 8.52, -12.43) cm
 ```
 
-The lens compares sorted dimensions and warns past 3%, which catches a dropped
-placement without firing on the Z-up to Y-up axis swap or on the few percent
-that tessellating a tiny sphere into flat facets costs.
-
-The addon states the file's units outright, and the lens uses that in
-preference to measuring. Measuring the loaded mesh turned out not to be
-trustworthy: across a real 21 part assembly the measured box came out two to
-five times too large for most parts, giving corrections between 21 and 39
-where every one should be 100, so each part was scaled by a wrong factor of
-its own and the assembly fell apart. The exporter writes metres and says so,
-which is exact and the same for every part. The measurement is kept as a
-cross check and warns when the two disagree by more than half.
-
-Two more things the addon does so that the size can be trusted.
-
-It reports the **tight** bounding box, from `optimalBoundingBox`, not
-`Shape.BoundBox`. The latter is only an estimate for curved geometry and can
-be a wild one: a mask built from three trimmed spherical faces reported
-78.6 x 103.9 x 141.0 mm while the part is really 31.4 x 53.3 x 54.7, which
-made the lens draw it at a third of its size.
-
-And it writes each part's mesh **about that part's own bottom centre**, then
-says separately where that point belongs. The lens measures a box that also
-contains the origin, so a part modelled 130 mm from the document origin used
-to measure 130 mm across however small it really was.
+All 21 parts at 100, the eyes symmetric about the body, the leaves out along
+the branch.
 
 ## What is proven, and what is not
 
-The pipeline works on real hardware: a model from a real FreeCAD document
-reaches the glasses and is shown at true size.
+**Confirmed on the glasses**, on a real 21 part FreeCAD assembly: parts arrive
+at true size, in their own colours, positioned correctly relative to each
+other. Both panels drag, the buttons work, and the dimension box appears only
+when a hand is near.
 
-Verified by automated tests, on FreeCAD's own interpreter: the sizing
-arithmetic including the 1 inch case, all three scale modes, per-body updates,
+**Verified by automated tests**, on FreeCAD's own interpreter: the sizing
+arithmetic including the 1 inch case and the stated unit scale, the tight
+bounding box, per part offsets, all three scale modes, per-body updates,
 removals, versioning, the WebSocket handshake against the RFC's test vector,
 and the tunnel end to end with the certificate verified.
 
-Not yet measured: sustained frame rate on the glasses, and the lens bundle
-size against the 25 MB publishing limit. The lens has not been submitted to
-Lens Explorer.
+**Not yet measured:** sustained frame rate on the glasses, and the lens bundle
+size against the 25 MB publishing limit. The ruler check has been verified
+arithmetically but not yet held up against a real part. The lens has not been
+submitted to Lens Explorer.
 
 ## Layout
 
@@ -335,7 +368,7 @@ freecad_addon/SpecsLink/             the addon, standard library only
   specslink/settings.py              preferences, in FreeCAD's own store
 Spectacles/Holo-CAD/                 the Lens Studio project
   Assets/Scripts/BridgeClient.ts     WebSocket client, reconnects on its own
-  Assets/Scripts/ModelLoader.ts      downloads, measures, scales, swaps in
+  Assets/Scripts/ModelLoader.ts      downloads, scales, places, tints, swaps in
   Assets/Scripts/ModelPlacement.ts   grab to move, two-handed pinch to resize
   Assets/Scripts/DimensionOverlay.ts the size label, and the reset control
   Assets/Scripts/TunnelPairing.ts    asks for the four words, remembers them
@@ -365,10 +398,13 @@ pass there means a pass where it matters.
   combinations.
 - `test_holocad_server.py` the embedded server: the RFC 6455 handshake against
   the spec's own test vector, host rewriting, version pruning, broadcast, a
-  frame past the 64 bit length boundary, and the refusals.
+  frame past the 64 bit length boundary, the refusals, and that closing a
+  peer whose socket has already gone is not an error.
 - `test_exporter.py` FreeCAD shapes to GLB: the 100 mm cube acceptance
   arithmetic, the 1 inch case under the imperial schema, the Z-up to Y-up
-  turn, placements inside an `App::Part`, and which objects get picked.
+  turn, placements inside an `App::Part`, which objects get picked, the tight
+  bounding box, the stated unit scale, and that a part modelled far from the
+  document origin still reports its own size and its own place.
 - `test_addon.py` the whole chain: a FreeCAD object through `service.send()`
   to a WebSocket client and a downloaded GLB, including all three scale modes,
   per-body sends, a deleted body being removed, and a lens that connects late.
