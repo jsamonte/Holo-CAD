@@ -180,7 +180,12 @@ assembly, and deleting one removes it from the glasses.
   to 20x.
 - The size label under the model updates as you scale. **Tap the label** to
   snap back to true 1:1, for that one part.
-- Both panels can be **dragged** wherever you want them.
+- The wireframe box and its measurements **appear only when your hand is near
+  enough to pinch the part**, so an assembly is not permanently inside a cage
+  of lines. Turn `onlyWhenNear` off on DimensionOverlay to have them always on.
+- Both panels can be **dragged** wherever you want them. The controls panel is
+  dragged by the **Holo-CAD strip along its top**, because its face is covered
+  in buttons and a pinch there presses one.
 
 Parts arrive in the colours FreeCAD gives them, one colour per body, taken
 from the object's Shape colour. A multi body document keeps its shape: every
@@ -198,6 +203,8 @@ otherwise hard to undo once a part is somewhere you cannot reach:
 | **Bring to me** | Everything back in front of you, sizes left alone. |
 | **Reset all** | Both of the above, plus rotation. |
 | **Grab: parts / whole** | Whether a grab moves one part or the whole assembly. |
+
+Drag the panel by the **Holo-CAD strip at the top**, not by its face.
 
 **Grab: whole** is what to use for an assembly you want to position as one
 piece. Only one of the two modes is live at a time, because a grabbable

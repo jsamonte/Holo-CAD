@@ -24,6 +24,7 @@
 
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 
+import {HANDLE} from "./FloatingPanel"
 import {ModelLoader} from "./ModelLoader"
 import {ModelPlacement} from "./ModelPlacement"
 
@@ -68,7 +69,41 @@ export class ControlPanel extends BaseScriptComponent {
   private grabLabel: Text | null = null
 
   onAwake(): void {
+    // In onAwake, not start: FloatingPanel looks for the handle in its own
+    // start, and every onAwake runs before any start, so this is the only
+    // ordering that works without wiring the two components together.
+    this.buildHandle()
     this.createEvent("OnStartEvent").bind(() => this.start())
+  }
+
+  /**
+   * A strip above the buttons to drag the panel by.
+   *
+   * The panel could not be moved before. Its face is covered in buttons,
+   * each with its own Interactable, and a pinch goes to the innermost one,
+   * so every attempt to drag the panel pressed a button instead.
+   */
+  private buildHandle(): void {
+    const panel = this.getSceneObject()
+    const step = this.buttonHeightCm + this.spacingCm
+    const stride = this.vertical ? step : this.buttonWidthCm + this.spacingCm
+    const top = (3 * stride) / 2 + step * (this.title.length > 0 ? 2 : 1)
+
+    const handle = global.scene.createSceneObject(HANDLE)
+    handle.setParent(panel)
+    handle.getTransform().setLocalPosition(new vec3(0, top, 0))
+
+    const label = handle.createComponent("Component.Text")
+    label.text = this.title.length > 0 ? this.title : "drag"
+    label.size = Math.max(8, Math.round(this.buttonHeightCm * 6))
+    label.horizontalAlignment = HorizontalAlignment.Center
+    label.verticalAlignment = VerticalAlignment.Center
+
+    const collider = handle.createComponent("Physics.ColliderComponent")
+    collider.debugDrawEnabled = false
+    const box = Shape.createBoxShape()
+    box.size = new vec3(this.buttonWidthCm, this.buttonHeightCm * 1.4, 2)
+    collider.shape = box
   }
 
   private start(): void {
@@ -95,12 +130,8 @@ export class ControlPanel extends BaseScriptComponent {
     // Four buttons, centred on the panel.
     const offset = (3 * stride) / 2
 
-    if (this.title.length > 0) {
-      const above = this.vertical
-        ? new vec3(0, offset + step, 0)
-        : new vec3(0, step, 0)
-      this.text(panel, this.title, above, this.buttonHeightCm * 0.5)
-    }
+    // No title text here: the handle above the buttons carries it, and two
+    // copies of the same word on one panel reads as a mistake.
 
     this.addButton(panel, "Reset size", 0, offset, stride, () => {
       if (this.placement !== null) {
@@ -185,18 +216,6 @@ export class ControlPanel extends BaseScriptComponent {
       this.refresh()
     })
     return label
-  }
-
-  /** Plain text with no hit area, for the heading. */
-  private text(parent: SceneObject, body: string, at: vec3, sizeCm: number): void {
-    const object = global.scene.createSceneObject("holocad_panel_title")
-    object.setParent(parent)
-    object.getTransform().setLocalPosition(at)
-    const label = object.createComponent("Component.Text")
-    label.text = body
-    label.size = Math.max(8, Math.round(sizeCm * 7))
-    label.horizontalAlignment = HorizontalAlignment.Center
-    label.verticalAlignment = VerticalAlignment.Center
   }
 
   /** Re-read the one caption that shows a state, after anything changes it. */

@@ -30,6 +30,7 @@
     labelSizeCm: false
     lineMaterial: false
     modelLoaderObject: false
+    onlyWhenNear: false
     visibleAtStart: false
   ScriptTypesHidden:
     {}
@@ -43,6 +44,7 @@
     - modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       lineMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
       visibleAtStart: false
+      onlyWhenNear: true
       labelSizeCm: !<float> 2.000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
@@ -52,5 +54,6 @@
     - '// @input SceneObject modelLoaderObject {"hint":"Object holding the ModelLoader. Leave empty to look on this object."}'
     - '// @input Asset.Material lineMaterial {"hint":"Unlit material for the wireframe. Without one the box is skipped."}'
     - '// @input bool visibleAtStart = true {"hint":"Show the box as soon as a model arrives."}'
+    - '// @input bool onlyWhenNear = true {"hint":"Only show the box while a hand is near the part, so it stays out of the way."}'
     - '// @input float labelSizeCm = 2 {"hint":"Label size in cm. Labels always face you."}'
     - '// @input SceneObject cameraObject {"hint":"Camera the labels turn to face. Leave empty to find the main camera."}'

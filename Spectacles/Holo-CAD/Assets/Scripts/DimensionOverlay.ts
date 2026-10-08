@@ -14,7 +14,7 @@
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 
 import {ModelLoader, ShownModel} from "./ModelLoader"
-import {ModelPlacement, UserScale} from "./ModelPlacement"
+import {ASSEMBLY_TARGET, ModelPlacement, UserScale} from "./ModelPlacement"
 
 const TAG = "HoloCAD DimensionOverlay"
 const OVERLAY = "holocad_dimensions"
@@ -43,6 +43,10 @@ export class DimensionOverlay extends BaseScriptComponent {
   visibleAtStart: boolean = true
 
   @input
+  @hint("Only show the box while a hand is near the part, so it stays out of the way.")
+  onlyWhenNear: boolean = true
+
+  @input
   @hint("Label size in cm. Labels always face you.")
   labelSizeCm: number = 2.0
 
@@ -59,6 +63,7 @@ export class DimensionOverlay extends BaseScriptComponent {
   private scaleLabels: Map<string, Text> = new Map()
   private userScales: Map<string, number> = new Map()
   private visible: boolean = false
+  private near: Set<string> = new Set()
 
   onAwake(): void {
     this.createEvent("OnStartEvent").bind(() => this.start())
@@ -81,8 +86,12 @@ export class DimensionOverlay extends BaseScriptComponent {
     this.placement = host.getComponent(ModelPlacement.getTypeName())
     if (this.placement !== null) {
       this.placement.onUserScaleChanged.add((scale) => this.onUserScale(scale))
+      this.placement.onProximityChanged.add((p) => this.onProximity(p.id, p.near))
     }
-    print(`${TAG}: ready, overlay ${this.visible ? "on" : "off"}`)
+    print(
+      `${TAG}: ready, overlay ${this.visible ? "on" : "off"}` +
+        (this.onlyWhenNear ? ", shown only while a hand is near" : "")
+    )
   }
 
   /** Flip the overlay. Wire this to a button. */
@@ -93,8 +102,8 @@ export class DimensionOverlay extends BaseScriptComponent {
 
   setVisible(visible: boolean): void {
     this.visible = visible
-    this.overlays.forEach((overlay) => {
-      overlay.enabled = visible
+    this.overlays.forEach((overlay, id) => {
+      overlay.enabled = this.shouldShow(id)
     })
     if (visible) {
       this.shown.forEach((model) => this.rebuild(model))
@@ -108,6 +117,9 @@ export class DimensionOverlay extends BaseScriptComponent {
     this.overlays.delete(id)
     this.scaleLabels.delete(id)
     this.userScales.delete(id)
+    // A part deleted while a hand was over it never reports the hand
+    // leaving, so without this its id would stay marked as near for good.
+    this.near.delete(id)
   }
 
   /**
@@ -167,7 +179,51 @@ ${factor.toFixed(2)}x true size, tap to reset`
       box.setParent(root)
     }
     this.buildLabels(root, model, w, h, d)
-    root.enabled = this.visible
+    root.enabled = this.shouldShow(model.id)
+  }
+
+  /**
+   * Whether this model's box should be on right now.
+   *
+   * A box drawn around every part all the time turns an assembly into a
+   * cage of lines you cannot see the model through, so by default the box
+   * waits until a hand is near enough to pinch the part. The overlay can
+   * still be switched off entirely, and that wins over proximity.
+   */
+  private shouldShow(id: string): boolean {
+    if (!this.visible) {
+      return false
+    }
+    if (!this.onlyWhenNear) {
+      return true
+    }
+    return this.near.has(id) || this.near.has(ASSEMBLY_TARGET)
+  }
+
+  /**
+   * A hand arrived at a model, or left it.
+   *
+   * The assembly reports under its own name rather than per part, because
+   * when the whole assembly is the grab target that is the only hover
+   * there is, and showing every box is the right answer to reaching for
+   * the whole thing.
+   */
+  private onProximity(id: string, near: boolean): void {
+    if (near) {
+      this.near.add(id)
+    } else {
+      this.near.delete(id)
+    }
+    if (id === ASSEMBLY_TARGET) {
+      this.overlays.forEach((overlay, each) => {
+        overlay.enabled = this.shouldShow(each)
+      })
+      return
+    }
+    const overlay = this.overlays.get(id)
+    if (overlay !== undefined) {
+      overlay.enabled = this.shouldShow(id)
+    }
   }
 
   /**

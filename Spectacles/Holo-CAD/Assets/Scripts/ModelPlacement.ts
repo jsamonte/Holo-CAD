@@ -24,6 +24,16 @@ const TAG = "HoloCAD ModelPlacement"
 const GRAB_BOX = "holocad_grab_box"
 const ASSEMBLY_BOX = "holocad_assembly_box"
 
+/** Said of a model when a hand comes within reach of it, or leaves. */
+export type Proximity = {
+  /** The model's id, or ASSEMBLY_TARGET for the assembly as a whole. */
+  id: string
+  near: boolean
+}
+
+/** Stands for every model at once, used when the assembly is the target. */
+export const ASSEMBLY_TARGET = "*"
+
 /** How big a model is right now, relative to the size FreeCAD reported. */
 export type UserScale = {
   id: string
@@ -72,6 +82,15 @@ export class ModelPlacement extends BaseScriptComponent {
 
   /** Fired when the grab target changes, with true for the whole assembly. */
   readonly onGrabModeChanged = new Signal<boolean>()
+
+  /**
+   * Fired when a hand comes within reach of a model, and when it leaves.
+   *
+   * This is SIK's own hover, which is what decides whether a pinch would
+   * land on the model, so it is the honest answer to "is my hand near this
+   * part" rather than a distance guessed at here.
+   */
+  readonly onProximityChanged = new Signal<Proximity>()
 
   private loader: ModelLoader | null = null
   private wired: Map<string, InteractableManipulation> = new Map()
@@ -127,6 +146,10 @@ export class ModelPlacement extends BaseScriptComponent {
     this.fitCollider(shown)
 
     const interactable = root.createComponent(Interactable.getTypeName())
+    interactable.onHoverEnter.add(() =>
+      this.onProximityChanged.emit({id: shown.id, near: true}))
+    interactable.onHoverExit.add(() =>
+      this.onProximityChanged.emit({id: shown.id, near: false}))
     const manipulation = root.createComponent(InteractableManipulation.getTypeName())
     manipulation.setCanTranslate(true)
     manipulation.setCanRotate(true)
@@ -307,6 +330,10 @@ export class ModelPlacement extends BaseScriptComponent {
     const root = this.loader.assemblyRoot()
     this.fitAssemblyCollider()
     this.assemblyInteractable = root.createComponent(Interactable.getTypeName())
+    this.assemblyInteractable.onHoverEnter.add(() =>
+      this.onProximityChanged.emit({id: ASSEMBLY_TARGET, near: true}))
+    this.assemblyInteractable.onHoverExit.add(() =>
+      this.onProximityChanged.emit({id: ASSEMBLY_TARGET, near: false}))
     const manipulation = root.createComponent(InteractableManipulation.getTypeName())
     manipulation.setCanTranslate(true)
     manipulation.setCanRotate(true)

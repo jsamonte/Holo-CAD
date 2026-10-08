@@ -20,6 +20,9 @@ import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Component
 
 const TAG = "HoloCAD FloatingPanel"
 
+/** A child with this name is used as the drag handle. */
+export const HANDLE = "holocad_panel_handle"
+
 @component
 export class FloatingPanel extends BaseScriptComponent {
   @input
@@ -39,12 +42,21 @@ export class FloatingPanel extends BaseScriptComponent {
   heightCm: number = 22
 
   @input
+  @hint("Height of the handle strip, in cm, when the panel has one.")
+  handleHeightCm: number = 5
+
+  @input
   @hint("Let the panel be grabbed and moved.")
   grabbable: boolean = true
 
   @input
   @hint("Keep the panel turned towards you as you move around it.")
   faceUser: boolean = true
+
+  @input
+  @hint("Grab here instead of anywhere on the panel. Leave empty to use the whole panel.")
+  @allowUndefined
+  handleObject!: SceneObject
 
   @input
   @hint("Camera to place in front of. Leave empty to find the main camera.")
@@ -91,22 +103,40 @@ export class FloatingPanel extends BaseScriptComponent {
     this.getSceneObject().getTransform().setWorldPosition(position)
   }
 
+  /**
+   * Make the panel draggable, from a handle when it has one.
+   *
+   * A panel whose face is covered in buttons cannot be grabbed by its face:
+   * every pinch lands on the innermost Interactable, which is a button, so
+   * the panel looked fixed in place while the buttons worked. A panel with
+   * a handle puts the grab on the handle alone and moves the panel through
+   * setManipulateRoot.
+   */
   private makeGrabbable(): void {
-    const object = this.getSceneObject()
+    const panel = this.getSceneObject()
+    const handle = this.resolveHandle()
+    const target = handle ?? panel
 
-    // The panel is text, which has no collider, so the grab area is stated
-    // rather than measured.
-    let collider = object.getComponent("Physics.ColliderComponent")
+    // Text has no collider, so the grab area is stated rather than
+    // measured. A handle states its own, since it is a strip rather than
+    // the whole panel.
+    let collider = target.getComponent("Physics.ColliderComponent")
     if (collider === null || collider === undefined) {
-      collider = object.createComponent("Physics.ColliderComponent")
+      collider = target.createComponent("Physics.ColliderComponent")
       collider.debugDrawEnabled = false
     }
-    const box = Shape.createBoxShape()
-    box.size = new vec3(this.widthCm, this.heightCm, 2)
-    collider.shape = box
+    if (handle === null) {
+      const box = Shape.createBoxShape()
+      box.size = new vec3(this.widthCm, this.heightCm, 2)
+      collider.shape = box
+    } else if (collider.shape === null || collider.shape === undefined) {
+      const box = Shape.createBoxShape()
+      box.size = new vec3(this.widthCm, this.handleHeightCm, 2)
+      collider.shape = box
+    }
 
-    object.createComponent(Interactable.getTypeName())
-    const manipulation = object.createComponent(
+    target.createComponent(Interactable.getTypeName())
+    const manipulation = target.createComponent(
       InteractableManipulation.getTypeName()
     )
     manipulation.setCanTranslate(true)
@@ -115,6 +145,33 @@ export class FloatingPanel extends BaseScriptComponent {
     // already keeps it facing you.
     manipulation.setCanRotate(false)
     manipulation.setCanScale(false)
+    if (handle !== null) {
+      // Drag the handle, move the panel.
+      manipulation.setManipulateRoot(panel.getTransform())
+    }
+    print(`${TAG}: draggable by ${handle !== null ? "its handle" : "its face"}`)
+  }
+
+  /**
+   * The handle to grab, from the inspector or by name.
+   *
+   * Found by name as well so a script that builds a panel can create its
+   * own handle without the two having to be wired together, and without
+   * depending on which component's start runs first. Every onAwake runs
+   * before any start, which is where the handle is made.
+   */
+  private resolveHandle(): SceneObject | null {
+    if (this.handleObject !== null && this.handleObject !== undefined) {
+      return this.handleObject
+    }
+    const panel = this.getSceneObject()
+    for (let i = 0; i < panel.getChildrenCount(); i++) {
+      const child = panel.getChild(i)
+      if (child.name === HANDLE) {
+        return child
+      }
+    }
+    return null
   }
 
   private resolveCamera(): SceneObject | null {
