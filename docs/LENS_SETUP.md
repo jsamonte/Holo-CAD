@@ -9,10 +9,28 @@ Steps marked **(by hand)** can only be done in the editor. The rest
 
 ## The short version
 
+Two builds, and picking the wrong one is the most common way to end up with a
+lens that reports a connection failure for no good reason.
+
+**Local network build**, for testing on your own Wi-Fi. Experimental APIs
+**on**, cannot be published:
+
 ```powershell
-py tools\wire_lens_scene.py --delete      # if a HoloCAD object already exists
+py tools\wire_lens_scene.py --delete
 py tools\wire_lens_scene.py
 ```
+
+**Publishable build**, which asks the wearer for the cloudflared words.
+Experimental APIs **off**:
+
+```powershell
+py tools\wire_lens_scene.py --delete
+py tools\wire_lens_scene.py --tunnel
+```
+
+A publishable build never dials a local address, so it does not report a
+failure to reach a machine it was never going to reach. It waits for the
+words instead.
 
 Then in Lens Studio: **Ctrl+S**, check **Experimental APIs** is on, and send to
 the glasses. The scene edits live only in the editor until you save, because

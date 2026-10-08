@@ -114,6 +114,7 @@ export class BridgeClient extends BaseScriptComponent {
   private internet: InternetModule | null = null
   private socket: WebSocket | null = null
   private pairingCode: string = ""
+  private held: boolean = false
   private closedByUs = false
   private retryDelay = 1
   private pingAccumulator = 0
@@ -134,6 +135,19 @@ export class BridgeClient extends BaseScriptComponent {
     this.createEvent("OnStartEvent").bind(() => this.start())
     this.createEvent("UpdateEvent").bind(() => this.update())
     this.createEvent("OnDestroyEvent").bind(() => this.close())
+  }
+
+  /**
+   * Wait for somebody else to supply the address.
+   *
+   * TunnelPairing calls this in onAwake, which always runs before any
+   * OnStartEvent, so a lens that gets its hostname from the wearer never
+   * tries the inspector's address first. Without it the lens reports a
+   * failure to reach a machine it was never going to reach, which reads as
+   * a broken connection rather than a missing step.
+   */
+  holdForPairing(): void {
+    this.held = true
   }
 
   private start(): void {
@@ -161,6 +175,10 @@ export class BridgeClient extends BaseScriptComponent {
       )
     }
 
+    if (this.held) {
+      this.setStatus("idle", "waiting for the address from the wearer")
+      return
+    }
     this.connect()
   }
 
@@ -211,7 +229,19 @@ export class BridgeClient extends BaseScriptComponent {
     try {
       socket = this.internet.createWebSocket(url)
     } catch (e) {
-      this.setStatus("failed", `createWebSocket rejected "${url}": ${e}`)
+      const message = `${e}`
+      if (message.indexOf("not secure") >= 0 && url.indexOf("ws://") === 0) {
+        // The exact state a published build lands in if it still has a
+        // development address. Saying so beats repeating the engine.
+        this.setStatus(
+          "failed",
+          "this build cannot use a plain ws:// address. Either turn " +
+            "Experimental APIs on for local testing, or give it the tunnel " +
+            "words from FreeCAD."
+        )
+      } else {
+        this.setStatus("failed", `createWebSocket rejected "${url}": ${e}`)
+      }
       return
     }
 

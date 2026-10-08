@@ -55,6 +55,9 @@ Write-Host ""
 $venv = Join-Path $root "bridge\.venv\Scripts\python.exe"
 
 $suites = @(
+    # First, because a workbench that fails to register is invisible: it
+    # just quietly does not appear in FreeCAD's list.
+    @{ Name = "initgui";  Exe = $python;     Script = "tools\test_initgui.py" },
     @{ Name = "server";   Exe = $python;     Script = "tools\test_holocad_server.py" },
     @{ Name = "exporter"; Exe = $freecadcmd; Script = "tools\test_exporter.py" },
     @{ Name = "addon";    Exe = $freecadcmd; Script = "tools\test_addon.py" },

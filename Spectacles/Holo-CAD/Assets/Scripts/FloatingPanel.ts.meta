@@ -1,0 +1,62 @@
+- !<AssetImportMetadata/0cee0b9c-c064-4487-8204-5fb402d6e116>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 8b56a139-b7d2-49a7-a9d3-06ea8c3ccf7a
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 8b56a139-b7d2-49a7-a9d3-06ea8c3ccf7a
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> d578021f-4041-404d-a57c-a5fc1641e686
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/d578021f-4041-404d-a57c-a5fc1641e686>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: 0b071f1b-3c87-46be-8bb9-4fc43aff1eb6
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    cameraObject: false
+    distanceCm: false
+    dropCm: false
+    faceUser: false
+    grabbable: false
+    heightCm: false
+    widthCm: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - distanceCm: !<float> 70.000000
+      dropCm: !<float> 18.000000
+      widthCm: !<float> 46.000000
+      heightCm: !<float> 22.000000
+      grabbable: true
+      faceUser: true
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input float distanceCm = 70 {"hint":"How far in front of you the panel starts, in cm."}'
+    - '// @input float dropCm = 18 {"hint":"How far below eye level it starts, in cm. Negative puts it above."}'
+    - '// @input float widthCm = 46 {"hint":"Width of the grab area, in cm."}'
+    - '// @input float heightCm = 22 {"hint":"Height of the grab area, in cm."}'
+    - '// @input bool grabbable = true {"hint":"Let the panel be grabbed and moved."}'
+    - '// @input bool faceUser = true {"hint":"Keep the panel turned towards you as you move around it."}'
+    - '// @input SceneObject cameraObject {"hint":"Camera to place in front of. Leave empty to find the main camera."}'

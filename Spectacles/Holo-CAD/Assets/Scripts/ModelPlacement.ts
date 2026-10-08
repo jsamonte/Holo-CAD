@@ -207,9 +207,9 @@ export class ModelPlacement extends BaseScriptComponent {
     if (collider === null || collider === undefined) {
       collider = holder.createComponent("Physics.ColliderComponent")
       collider.debugDrawEnabled = false
-      // Nothing should fall, bounce or push the model about. The collider is
-      // only here so the interaction system has something to hit.
-      collider.intangible = true
+      // Not intangible: an intangible collider is skipped by the
+      // interaction raycast, so the model looked grabbable and was not.
+      // With no rigid body on it this is inert anyway.
     }
     const box = Shape.createBoxShape()
     box.size = new vec3(

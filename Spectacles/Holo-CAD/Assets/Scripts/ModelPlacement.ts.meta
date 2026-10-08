@@ -27,8 +27,10 @@
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
     allowManipulation: false
-    freeScale: false
+    allowResize: false
     grabPaddingCm: false
+    maxScale: false
+    minScale: false
     modelLoaderObject: false
   ScriptTypesHidden:
     {}
@@ -41,13 +43,17 @@
   DefaultScriptInputs:
     - modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       allowManipulation: true
-      freeScale: false
+      allowResize: true
       grabPaddingCm: !<float> 2.000000
+      minScale: 0.050000
+      maxScale: !<float> 20.000000
   ScriptTypes:
     -
       {}
   InputLines:
     - '// @input SceneObject modelLoaderObject {"hint":"Object holding the ModelLoader. Leave empty to look on this object."}'
     - '// @input bool allowManipulation = true {"hint":"Let the model be grabbed, moved and turned."}'
-    - '// @input bool freeScale {"hint":"Allow pinch to resize. Off keeps the model at the size FreeCAD says."}'
+    - '// @input bool allowResize = true {"hint":"Two handed pinch to resize. Reset size puts it back to 1:1."}'
     - '// @input float grabPaddingCm = 2 {"hint":"Padding added to the grab box, in cm, so thin parts stay catchable."}'
+    - '// @input float minScale = 0.05 {"hint":"Smallest you can shrink to, as a fraction of true size."}'
+    - '// @input float maxScale = 20 {"hint":"Largest you can grow to, as a multiple of true size."}'

@@ -22,11 +22,16 @@
   VersionMajor: 0
   VersionMinor: 0
   VersionPatch: 0
-  ComponentUid: 00000000-0000-0000-0000-000000000000
+  ComponentUid: ac1f07ed-8a91-45f6-bddf-cde723a23aa0
   ExportUid: 00000000-0000-0000-0000-000000000000
   PackagePolicy: CanBeUnpacked
   ScriptInputsHidden:
-    {}
+    askAtStart: false
+    bridgeClientObject: false
+    promptText: false
+    remember: false
+    takeOver: false
+    words: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -36,10 +41,19 @@
   Attachments:
     []
   DefaultScriptInputs:
-    -
-      {}
+    - bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      promptText: !<reference.Text> 00000000-0000-0000-0000-000000000000
+      askAtStart: true
+      remember: true
+      takeOver: true
+      words: ""
   ScriptTypes:
     -
       {}
   InputLines:
-    []
+    - '// @input SceneObject bridgeClientObject {"hint":"Object holding the BridgeClient. Leave empty to look on this object."}'
+    - '// @input Component.Text promptText {"hint":"Text that prompts for the words and shows what was typed."}'
+    - '// @input bool askAtStart = true {"hint":"Ask for the words as soon as the lens opens, when none are stored."}'
+    - '// @input bool remember = true {"hint":"Remember the words between sessions."}'
+    - "// @input bool takeOver = true {\"hint\":\"Supply the address instead of BridgeClient's. Turn off for a local network build.\"}"
+    - '// @input string words {"hint":"Words typed here are used instead of asking. The keyboard never appears in the Spectacles preview, so this is how to test there."}'

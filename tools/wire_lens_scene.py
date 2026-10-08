@@ -44,6 +44,7 @@ CONFIG = os.path.join(os.path.expanduser("~"), ".claude.json")
 OBJECT_NAME = "HoloCAD"
 STATUS_OBJECT = "HoloCAD Status"
 PROMPT_OBJECT = "HoloCAD Prompt"
+PANEL_OBJECT = "HoloCAD Panel"
 MATERIAL_NAME = "HoloCAD Model Material"
 LINE_MATERIAL_NAME = "HoloCAD Wireframe Material"
 SCRIPTS = ["BridgeClient", "ModelLoader", "ModelPlacement", "DimensionOverlay",
@@ -126,10 +127,20 @@ def asset_id(result):
 
 
 def find_asset(name, kind=None):
+    """An asset by exact name, and by type when one is given.
+
+    GetLensStudioAssetsByName matches loosely: asking for "HoloCAD Wireframe
+    Material" came back with four UI Kit Frame assets. Taking the first hit
+    meant wiring a ShaderGraphPass into a Material input, which was rejected,
+    and the material it should have created was never made.
+    """
     res = tool("GetLensStudioAssetsByName", {"name": name})
     for a in res.get("assets", []) if isinstance(res, dict) else []:
-        if kind is None or a.get("type") == kind:
-            return a["id"]
+        if a.get("name") != name:
+            continue
+        if kind is not None and a.get("type") != kind:
+            continue
+        return a["id"]
     return None
 
 
@@ -158,12 +169,39 @@ def find_camera_object():
     return found[0] if found else None
 
 
-def ensure_text(name, height, size=48):
-    """A head locked Text, so what it says cannot be looked away from.
+def ensure_panel():
+    """One floating panel in world space, holding both labels.
 
-    Parented to the camera on purpose: a prompt asking the wearer to type
-    something is useless if they have to go hunting for it.
+    Not parented to the camera. Head locked text sat in the middle of
+    whatever you were looking at and could not be moved out of the way,
+    which is wrong for a readout that stays up while you work on a part.
+    FloatingPanel places it in front of you once and makes it grabbable.
     """
+    print("")
+    print("floating panel:")
+    existing = tool("GetLensStudioSceneObjectByName", {"name": PANEL_OBJECT})
+    if existing.get("objects"):
+        holder = existing["objects"][0]
+        pid = holder.get("id") or holder.get("objectUUID")
+        print("  reusing {0}".format(pid))
+        return pid
+    created = tool("CreateLensStudioSceneObject", {"name": PANEL_OBJECT})
+    pid = created["objectUUID"]
+    print("  created {0}".format(pid))
+    res = tool("CreateLensStudioComponent",
+               {"objectUUID": pid, "componentType": "ScriptComponent"})
+    cid = (res.get("newComponent") or {}).get("id")
+    script = find_asset("FloatingPanel", "TypeScriptAsset")
+    if cid and script:
+        set_prop(cid, "scriptAsset", script, "reference")
+        set_prop(cid, "name", "FloatingPanel", "string")
+    else:
+        print("  FAIL could not attach FloatingPanel")
+    return pid
+
+
+def ensure_text(name, height, size=48, parent=None):
+    """A Text label, by default on the floating panel."""
     print("")
     print("{0}:".format(name))
     existing = tool("GetLensStudioSceneObjectByName", {"name": name})
@@ -172,17 +210,12 @@ def ensure_text(name, height, size=48):
         oid = holder.get("id") or holder.get("objectUUID")
         print("  reusing {0}".format(oid))
     else:
-        camera = find_camera_object()
-        if camera is None:
-            print("  FAIL no camera in the scene, cannot place the panel")
-            return None
         created = tool("CreateLensStudioSceneObject",
-                       {"name": name, "parentUUID": camera})
+                       {"name": name, "parentUUID": parent})
         oid = created["objectUUID"]
-        print("  created {0} under the camera".format(oid))
-        # In front of the viewer and a little low. The camera looks along
-        # its own negative Z, so forward is a negative z here.
-        for axis, value in (("x", 0.0), ("y", height), ("z", -60.0)):
+        print("  created {0} on the panel".format(oid))
+        # Stacked on the panel, which is itself placed in front of the user.
+        for axis, value in (("x", 0.0), ("y", height), ("z", 0.0)):
             set_prop(oid, "localTransform.position." + axis, value, "number")
 
     obj = tool("GetLensStudioSceneObjectById", {"objectUUID": oid})["object"]
@@ -217,6 +250,15 @@ def main() -> int:
             "lens cannot use ws or http at all."
         ),
     )
+    ap.add_argument(
+        "--tunnel",
+        action="store_true",
+        help=(
+            "Publishable build: the lens asks the wearer for the cloudflared "
+            "words and connects to wss://<words>.trycloudflare.com. Use with "
+            "Experimental APIs off."
+        ),
+    )
     ap.add_argument("--delete", action="store_true", help="delete the object and exit")
     args = ap.parse_args()
 
@@ -244,7 +286,13 @@ def main() -> int:
         print("{0} already exists ({1}). Re-run with --delete first.".format(OBJECT_NAME, existing))
         return 1
 
-    if args.relay:
+    if args.tunnel:
+        # The address comes from the wearer at runtime, so what is left in
+        # the inspector only shows what shape it takes.
+        bridge_url = "wss://type-the-words-from-freecad.trycloudflare.com/ws"
+        print("publishable build: the lens will ask for the tunnel words")
+        print("  Experimental APIs must be OFF for this build")
+    elif args.relay:
         host = args.relay.replace("https://", "").replace("http://", "").strip("/")
         bridge_url = "wss://{0}/lens".format(host)
         print("relay url: {0}".format(bridge_url))
@@ -276,7 +324,7 @@ def main() -> int:
 
     # 2. A PBR material for imported meshes, and an unlit one for the
     #    dimension wireframe, which should not be shaded like a surface.
-    mat = find_asset(MATERIAL_NAME)
+    mat = find_asset(MATERIAL_NAME, "Material")
     if mat is None:
         mat = asset_id(tool("CreateAssetFromPresetTool",
                             {"preset": "PBRMaterialPreset", "name": MATERIAL_NAME}))
@@ -285,7 +333,7 @@ def main() -> int:
         print("  FAIL no material, ModelLoader cannot instantiate anything without one")
         return 1
 
-    line_mat = find_asset(LINE_MATERIAL_NAME)
+    line_mat = find_asset(LINE_MATERIAL_NAME, "Material")
     if line_mat is None:
         line_mat = asset_id(tool("CreateAssetFromPresetTool",
                                  {"preset": "UnlitMaterialPreset",
@@ -336,13 +384,21 @@ def main() -> int:
         set_prop(comps["DimensionOverlay"], "lineMaterial", line_mat, "reference")
     print("  ModelPlacement")
     set_prop(comps["ModelPlacement"], "allowResize", True, "boolean")
+    print("  DimensionOverlay")
+    set_prop(comps["DimensionOverlay"], "visibleAtStart", True, "boolean")
+    print("  TunnelPairing")
+    # Only a tunnel build should ask the wearer for an address. Left on for
+    # a local build, the lens would sit waiting for words nobody has.
+    set_prop(comps["TunnelPairing"], "takeOver", bool(args.tunnel), "boolean")
+    set_prop(comps["TunnelPairing"], "askAtStart", bool(args.tunnel), "boolean")
 
     # Two head locked labels. Without them the tunnel words have nowhere to
     # be asked for, and pairing cannot be completed at all.
-    prompt_id = ensure_text(PROMPT_OBJECT, 6.0, 56)
+    panel = ensure_panel()
+    prompt_id = ensure_text(PROMPT_OBJECT, 5.0, 56, panel)
     if prompt_id:
         set_prop(comps["TunnelPairing"], "promptText", prompt_id, "reference")
-    status_id = ensure_text(STATUS_OBJECT, -8.0, 44)
+    status_id = ensure_text(STATUS_OBJECT, -6.0, 44, panel)
     if status_id:
         set_prop(comps["StatusPanel"], "statusText", status_id, "reference")
 

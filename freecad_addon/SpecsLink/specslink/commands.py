@@ -104,12 +104,30 @@ class ShareOverInternet(object):
         return True
 
     def Activated(self, index=None):
-        if service.tunnel_handle().running:
+        handle = service.tunnel_handle()
+
+        # Pressing again while it is still coming up used to stop it. A
+        # quick tunnel takes ten to twenty seconds, which is long enough
+        # that pressing again is the natural thing to do, so that press
+        # now reports progress instead of undoing the work.
+        if handle.starting:
+            service.log(
+                "still opening the tunnel, Cloudflare has not named it yet. "
+                "This takes up to twenty seconds, and the words appear here "
+                "when it is ready."
+            )
+            return
+
+        if handle.running or handle.hostname:
             service.stop_tunnel()
             return
+
         if not service.start_tunnel():
             return
-        service.log("waiting for the tunnel to come up, a few seconds")
+        service.log(
+            "opening a tunnel. This takes up to twenty seconds, and the "
+            "words to type into the lens appear here when it is ready."
+        )
 
 
 class ShowSettings(object):

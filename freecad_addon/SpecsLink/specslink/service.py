@@ -113,8 +113,12 @@ def start_server() -> str:
         url = server.start()
     except OSError as e:
         error(
-            "could not listen on port {0}: {1}. Something else may be using "
-            "it, or change the port in Settings.".format(server.port, e)
+            "could not listen on port {0}: {1}".format(server.port, e)
+        )
+        error(
+            "Something else already has that port, very likely another "
+            "FreeCAD or a server left running from earlier. Close it, or "
+            "change the port in Holo-CAD Settings."
         )
         raise
     log("ready. Paste this into the lens BridgeClient bridgeUrl input:")

@@ -87,6 +87,14 @@ class _QuietServer(ThreadingHTTPServer):
 
     log = staticmethod(lambda message: None)
 
+    # Windows treats SO_REUSEADDR as permission to take a port another
+    # process is already listening on. socketserver turns it on by
+    # default, so a second server bound 8765 alongside FreeCAD's, both
+    # claimed success, and which one answered was anyone's guess. An hour
+    # went into chasing that. Failing loudly is worth the occasional
+    # "address already in use" after a very fast restart.
+    allow_reuse_address = False
+
     def handle_error(self, request, client_address):
         import sys
 
@@ -154,11 +162,32 @@ class ModelStore:
             }
 
 
+def rewrite_host(url: str, base: str) -> str:
+    """Point a model url at `base`, keeping its path.
+
+    Used so each lens is told to fetch from whatever address it reached us
+    on. A lens that came in through a tunnel is given the tunnel's https
+    url; one on the same Wi-Fi is given the LAN one. Nothing has to be
+    configured, and the two can never disagree.
+    """
+    if not base:
+        return url
+    marker = url.find("://")
+    if marker < 0:
+        return url
+    rest = url[marker + 3:]
+    slash = rest.find("/")
+    path = rest[slash:] if slash >= 0 else ""
+    return base.rstrip("/") + path
+
+
 class WebSocketPeer:
     """One connected lens. Frames out are serialised by a per peer lock."""
 
-    def __init__(self, handler):
+    def __init__(self, handler, base=""):
         self.handler = handler
+        # Where this particular lens reached us, from its own request.
+        self.base = base
         self.lock = threading.Lock()
         self.closed = False
 
@@ -334,12 +363,17 @@ class Bridge:
         return self.store.ids()
 
     def broadcast(self, message: dict) -> int:
-        text = json.dumps(message)
         with self._peers_lock:
             peers = list(self.peers)
         alive = 0
         for peer in peers:
-            if peer.send_text(text):
+            # Each lens is told the url that works for it, rather than one
+            # url chosen in advance that may suit none of them.
+            payload = message
+            if peer.base and message.get("url"):
+                payload = dict(message)
+                payload["url"] = rewrite_host(message["url"], peer.base)
+            if peer.send_text(json.dumps(payload)):
                 alive += 1
             else:
                 self.remove_peer(peer)
@@ -475,8 +509,20 @@ def _make_handler(bridge: Bridge):
             self.end_headers()
             self.wfile.flush()
 
-            peer = WebSocketPeer(self)
+            # Where this lens actually reached us. Through a tunnel the
+            # Host is the tunnel's name and X-Forwarded-Proto is https; on
+            # the same Wi-Fi it is the LAN address. Either way the model
+            # urls it is given will work for it, with nothing configured.
+            host = self.headers.get("Host") or ""
+            proto = (self.headers.get("X-Forwarded-Proto") or "").lower()
+            if proto not in ("http", "https"):
+                proto = "http"
+            base = "{0}://{1}".format(proto, host) if host else ""
+
+            peer = WebSocketPeer(self, base)
             bridge.add_peer(peer)
+            if base:
+                bridge._log("Holo-CAD lens reached us at {0}".format(base))
             bridge._log("Holo-CAD lens connected from {0} ({1} total)".format(
                 self.client_address[0], bridge.lens_count))
 
@@ -485,7 +531,11 @@ def _make_handler(bridge: Bridge):
             # Catch a lens up on everything already exported, so opening the
             # lens after the export still shows the model.
             for message in bridge.store.latest():
-                peer.send_text(json.dumps(message))
+                caught_up = message
+                if peer.base and message.get("url"):
+                    caught_up = dict(message)
+                    caught_up["url"] = rewrite_host(message["url"], peer.base)
+                peer.send_text(json.dumps(caught_up))
 
             try:
                 self._pump(peer)
@@ -608,20 +658,62 @@ def main():
 
     ap = argparse.ArgumentParser(description="Holo-CAD server, standalone")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
+    ap.add_argument(
+        "--share",
+        action="store_true",
+        help=(
+            "Open a cloudflared tunnel as well, so a published lens can "
+            "reach this machine, and print the words to type into the lens. "
+            "Needs cloudflared installed."
+        ),
+    )
     args = ap.parse_args()
 
     bridge = Bridge(args.port, log=lambda message: print(message, flush=True))
     bridge.start()
+
+    handle = None
+    if args.share:
+        # Imported here so the server still runs for anyone without the
+        # tunnel module beside it.
+        import os
+        import sys
+
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from specslink import tunnel as tunnel_module
+
+        def ready(public_base):
+            bridge.public_base = public_base
+            print("")
+            print("  TYPE THESE WORDS INTO THE LENS:")
+            print("      {0}".format(handle.words))
+            print("")
+            print("  the lens will reach this machine at {0}".format(
+                bridge.socket_url()))
+            print("", flush=True)
+
+        handle = tunnel_module.Tunnel(
+            log=lambda message: print(message, flush=True),
+            warn=lambda message: print("WARNING: " + message, flush=True),
+            on_ready=ready,
+        )
+        if not handle.start(args.port):
+            print("carrying on without sharing", flush=True)
+
     print("")
-    print("Paste this into the lens BridgeClient bridgeUrl input:")
+    print("On the same Wi-Fi, paste this into the lens bridgeUrl input:")
     print("  {0}".format(bridge.socket_url()))
     print("")
     print("  health check   {0}/status".format(bridge.base_url()))
+    if args.share:
+        print("  waiting for the tunnel, the words follow in a few seconds")
     print("", flush=True)
     try:
         while True:
             time.sleep(3600)
     except KeyboardInterrupt:
+        if handle is not None:
+            handle.stop()
         bridge.stop()
 
 

@@ -153,6 +153,11 @@ class Tunnel:
         return self._process is not None and self._process.poll() is None
 
     @property
+    def starting(self) -> bool:
+        """Running, but Cloudflare has not named it yet."""
+        return self.running and not self.hostname
+
+    @property
     def words(self) -> str:
         """Just the part a person has to type, without the fixed suffix."""
         if not self.hostname:
@@ -227,9 +232,13 @@ class Tunnel:
             if match:
                 self.hostname = match.group(0).replace("https://", "")
                 self._write_state(process.pid, self._port)
-                self._log("tunnel open at https://{0}".format(self.hostname))
-                self._log("    type these words into the lens: {0}".format(
-                    self.words))
+                self._log("=" * 58)
+                self._log("TUNNEL READY. Type these words into the lens:")
+                self._log("")
+                self._log("    {0}".format(self.words))
+                self._log("")
+                self._log("full address https://{0}".format(self.hostname))
+                self._log("=" * 58)
                 self._log("    they stay valid until you stop sharing, even "
                           "across FreeCAD restarts")
                 try:

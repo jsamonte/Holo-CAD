@@ -43,6 +43,24 @@ QUALITY = {
     "fine": (0.02, 0.30),
 }
 DEFAULT_QUALITY = "normal"
+
+# Origin and datum geometry. These have shapes, and the planes even have
+# faces, but none of them is part of the model anyone wants to look at.
+DATUM_TYPES = frozenset((
+    "App::Origin", "App::Line", "App::Plane", "App::Point",
+    "PartDesign::Line", "PartDesign::Plane", "PartDesign::Point",
+    "PartDesign::CoordinateSystem",
+))
+
+# Anything bigger than a kilometre is not a part, it is something infinite
+# wearing a bounding box.
+UNBOUNDED_MM = 1.0e6
+
+# Containers worth keeping instead of their contents. Pruning normally
+# keeps the leaf and drops the ancestor, which is right for an assembly
+# holding separate parts, and wrong for a PartDesign Body: its contents
+# are the intermediate features that build up the one solid you want.
+PREFERRED_CONTAINERS = frozenset(("PartDesign::Body", "App::Part"))
 DEFAULT_COLOUR = (0.78, 0.80, 0.84, 1.0)
 
 
@@ -69,6 +87,38 @@ def is_visible(obj) -> bool:
         return True
 
 
+def has_renderable_shape(obj) -> bool:
+    """Whether this object would actually produce triangles.
+
+    Having a Shape is not enough, and assuming it was is what made a real
+    PartDesign document fail. Such a document is full of objects that have
+    a Shape and tessellate to nothing: origin axes, datum planes, datum
+    points, and every sketch. Picking those up produced an empty GLB and
+    the unhelpful message "every object tessellated to nothing". Worse, an
+    origin axis is an infinite line whose bounding box reads about 2e+98
+    mm, which would have made the true size meaningless had anything got
+    that far.
+
+    Faces are the test. No faces, no triangles, nothing to look at.
+    """
+    if getattr(obj, "TypeId", "") in DATUM_TYPES:
+        return False
+    shape = getattr(obj, "Shape", None)
+    if shape is None or shape.isNull():
+        return False
+    try:
+        if len(shape.Faces) == 0:
+            return False
+        # Datum planes are infinite, and report a bounding box around
+        # 2e+98 mm while having a perfectly good face. A size check
+        # catches those, and anything else unbounded, whatever it is
+        # called.
+        box = shape.BoundBox
+        return max(box.XLength, box.YLength, box.ZLength) < UNBOUNDED_MM
+    except Exception:
+        return False
+
+
 def collect_objects(doc=None, selection=None) -> list:
     """The selected objects, or every visible solid when nothing is selected.
 
@@ -80,14 +130,36 @@ def collect_objects(doc=None, selection=None) -> list:
     if doc is None:
         raise ExportError("no active document")
 
-    chosen = [o for o in (selection or []) if has_shape(o)]
+    asked_for = list(selection or [])
+    chosen = [o for o in asked_for if has_renderable_shape(o)]
+    if asked_for and not chosen:
+        raise ExportError(
+            "nothing to send: the selection has no surfaces to show. "
+            "Sketches, datum planes and origin axes have no faces, so "
+            "select a body or a solid instead."
+        )
+
     if not chosen:
-        chosen = [o for o in doc.Objects if has_shape(o) and is_visible(o)]
+        chosen = [
+            o for o in doc.Objects
+            if has_renderable_shape(o) and is_visible(o)
+        ]
     if not chosen:
         raise ExportError(
-            "nothing to send: no selected object has a shape, and no visible "
-            "object in this document does either"
+            "nothing to send: this document has no visible object with any "
+            "surfaces. Make a body visible, or select one."
         )
+
+    # A Body wins over the features inside it. Without this the Body is
+    # treated as a mere ancestor and dropped, and what gets exported is
+    # some intermediate Pad rather than the finished part.
+    inside_a_container = set()
+    for obj in chosen:
+        if getattr(obj, "TypeId", "") not in PREFERRED_CONTAINERS:
+            continue
+        for descendant in _descendants(obj):
+            inside_a_container.add(descendant)
+    chosen = [o for o in chosen if o.Name not in inside_a_container]
 
     names = {o.Name for o in chosen}
     pruned = []
@@ -98,6 +170,18 @@ def collect_objects(doc=None, selection=None) -> list:
             continue
         pruned.append(obj)
     return pruned or chosen
+
+
+def _descendants(obj, seen=None) -> set:
+    """Every object below this one, by name, cycles tolerated."""
+    seen = seen if seen is not None else set()
+    for child in getattr(obj, "OutList", []):
+        name = getattr(child, "Name", None)
+        if name is None or name in seen:
+            continue
+        seen.add(name)
+        _descendants(child, seen)
+    return seen
 
 
 def global_shape(obj):

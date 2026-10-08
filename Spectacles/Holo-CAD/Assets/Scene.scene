@@ -4,7 +4,8 @@
     - !<own> 00000000-0000-0065-0000-000000000064
     - !<own> 0005641c-028d-459a-0000-000000014b4d
     - !<own> 5aa0f98b-e799-448c-a2dc-cae5d04fa2a4
-    - !<own> 4a3c8b50-7d60-413a-bc58-a11643c050f2
+    - !<own> 827b8617-0291-434e-a9da-b637e42b2c49
+    - !<own> 868ee4cf-1754-41fb-8db5-622b31233581
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       []
@@ -187,46 +188,6 @@
     - !<own> 8b1597e7-0f83-4295-a17b-d12cd299f954
   Components:
     []
-- !<ScriptComponent/01fcdc29-9e43-47c0-a2c5-3af319589b70>
-  PrefabRemaps:
-    []
-  Name: ModelPlacement
-  Enabled: true
-  ScriptAsset: !<reference> f810eac0-7d47-47a7-a8a6-a8d7e71ffde7
-  ScriptInputsDefault:
-    modelLoaderObject: true
-    allowManipulation: true
-    freeScale: true
-    grabPaddingCm: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      allowManipulation: true
-      freeScale: false
-      grabPaddingCm: !<float> 2.000000
-  ScriptTypes:
-    "":
-      {}
-- !<ScriptComponent/02fdc4dc-2753-4f4a-b88e-309b3d14df8d>
-  PrefabRemaps:
-    []
-  Name: StatusPanel
-  Enabled: true
-  ScriptAsset: !<reference> e8bbddfb-848d-458e-80f4-fa197c7e59a4
-  ScriptInputsDefault:
-    statusText: true
-    sourceObject: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      statusText: !<reference.Text> 00000000-0000-0000-0000-000000000000
-      sourceObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/031abae4-7029-4da6-89ec-08d2369c519f>
   PrefabRemaps:
     []
@@ -257,26 +218,30 @@
     - !<own> c89d7e48-75a6-414e-a253-874f80bfe792
   Components:
     []
-- !<ScriptComponent/0656ee40-5af1-41ae-b84e-6cc362bb94b3>
+- !<ScriptComponent/09845f2f-1940-4e67-bd58-823e51ca9f67>
   PrefabRemaps:
     []
-  Name: DimensionOverlay
+  Name: FloatingPanel
   Enabled: true
-  ScriptAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
+  ScriptAsset: !<reference> 8b56a139-b7d2-49a7-a9d3-06ea8c3ccf7a
   ScriptInputsDefault:
-    modelLoaderObject: true
-    lineMaterial: true
-    visibleAtStart: true
-    labelSizeCm: true
+    distanceCm: true
+    dropCm: true
+    widthCm: true
+    heightCm: true
+    grabbable: true
+    faceUser: true
     cameraObject: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
     "":
-      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      lineMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
-      visibleAtStart: false
-      labelSizeCm: !<float> 2.000000
+      distanceCm: !<float> 70.000000
+      dropCm: !<float> 18.000000
+      widthCm: !<float> 46.000000
+      heightCm: !<float> 22.000000
+      grabbable: true
+      faceUser: true
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
@@ -341,6 +306,35 @@
     - !<own> 0f704a07-d079-4984-9aaf-bf4a989b3490
   Components:
     []
+- !<ScriptComponent/11cd9c4e-3370-49e2-a55a-8e738ba1aedb>
+  PrefabRemaps:
+    []
+  Name: ModelLoader
+  Enabled: true
+  ScriptAsset: !<reference> 74704b0a-30f9-4f82-9056-c10b6fdbcb79
+  ScriptInputsDefault:
+    bridgeClientObject: true
+    modelsParent: true
+    cameraObject: true
+    spawnDistanceCm: true
+    spawnDropCm: true
+    axisTolerance: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
+      remoteMediaModule: !<reference.RemoteMediaModule> 5585ebf2-64c6-44eb-832c-690bbb357032
+      material: !<reference.Material> c69ebc19-cdbb-4195-bcc6-4029941362d0
+      bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      modelsParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      spawnDistanceCm: !<float> 50.000000
+      spawnDropCm: !<float> 15.000000
+      axisTolerance: 0.010000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/11fcf3ea-da8b-4694-80a7-167693341344>
   PrefabRemaps:
     []
@@ -461,35 +455,6 @@
     - !<own> 298f274e-575f-40f7-a4f3-e4eaeaaecd67
   Components:
     []
-- !<ScriptComponent/1f1a6cfb-6bde-4e39-8577-21075ab11573>
-  PrefabRemaps:
-    []
-  Name: ModelLoader
-  Enabled: true
-  ScriptAsset: !<reference> 74704b0a-30f9-4f82-9056-c10b6fdbcb79
-  ScriptInputsDefault:
-    bridgeClientObject: true
-    modelsParent: true
-    cameraObject: true
-    spawnDistanceCm: true
-    spawnDropCm: true
-    axisTolerance: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
-      remoteMediaModule: !<reference.RemoteMediaModule> 5585ebf2-64c6-44eb-832c-690bbb357032
-      material: !<reference.Material> c69ebc19-cdbb-4195-bcc6-4029941362d0
-      bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      modelsParent: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
-      spawnDistanceCm: !<float> 50.000000
-      spawnDropCm: !<float> 15.000000
-      axisTolerance: 0.010000
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/1fbad860-d2cc-4f57-a307-5ac38abfa448>
   PrefabRemaps:
     []
@@ -537,6 +502,21 @@
   ScriptTypes:
     "":
       {}
+- !<SceneObject/24a140cf-33e0-42c6-8e29-7e66636c6214>
+  PrefabRemaps:
+    []
+  Name: HoloCAD Prompt
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 5.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> cc43f6a5-d82d-47aa-9f6e-d8dea695d153
 - !<SceneObject/25a5160c-dd09-4e72-9e5d-156e2f82f869>
   PrefabRemaps:
     []
@@ -743,25 +723,6 @@
     - !<own> edc3f854-bedb-4fbf-924b-9f93e6264c2f
   Components:
     []
-- !<ScriptComponent/31fbe5db-ae10-4e6c-a6cb-6992f5eb20c4>
-  PrefabRemaps:
-    []
-  Name: BridgeClient
-  Enabled: true
-  ScriptAsset: !<reference> 34b49d7c-5f20-4a49-b9ff-30114ec33638
-  ScriptInputsDefault:
-    pingSeconds: true
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      bridgeUrl: "ws://192.168.1.56:8765/ws"
-      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
-      verbose: true
-      pingSeconds: !<float> 15.000000
-  ScriptTypes:
-    "":
-      {}
 - !<ScriptComponent/329940fb-34dd-413d-8f14-ed6fa1f135b5>
   PrefabRemaps:
     []
@@ -799,6 +760,32 @@
       mouseTargetingMode: !<float> 2.000000
       moveInDepth: false
       moveInDepthAmount: !<float> 5.000000
+  ScriptTypes:
+    "":
+      {}
+- !<ScriptComponent/34d2b270-6f7f-42e2-baf2-943c2ed0a42a>
+  PrefabRemaps:
+    []
+  Name: ModelPlacement
+  Enabled: true
+  ScriptAsset: !<reference> f810eac0-7d47-47a7-a8a6-a8d7e71ffde7
+  ScriptInputsDefault:
+    modelLoaderObject: true
+    allowManipulation: true
+    allowResize: true
+    grabPaddingCm: true
+    minScale: true
+    maxScale: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      allowManipulation: true
+      allowResize: true
+      grabPaddingCm: !<float> 2.000000
+      minScale: 0.050000
+      maxScale: !<float> 20.000000
   ScriptTypes:
     "":
       {}
@@ -1054,25 +1041,6 @@
     []
   Components:
     - !<own> 55be292f-0363-41f1-b55c-70fcb8e4dd25
-- !<SceneObject/4a3c8b50-7d60-413a-bc58-a11643c050f2>
-  PrefabRemaps:
-    []
-  Name: HoloCAD
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 31fbe5db-ae10-4e6c-a6cb-6992f5eb20c4
-    - !<own> 1f1a6cfb-6bde-4e39-8577-21075ab11573
-    - !<own> 01fcdc29-9e43-47c0-a2c5-3af319589b70
-    - !<own> 0656ee40-5af1-41ae-b84e-6cc362bb94b3
-    - !<own> 02fdc4dc-2753-4f4a-b88e-309b3d14df8d
 - !<SceneObject/4a8fba8e-5e79-4c17-9b90-eecc02c7b7dc>
   PrefabRemaps:
     []
@@ -1153,6 +1121,28 @@
     - !<own> 974e2072-cd2a-4664-8d91-d71bbcd60d54
   Components:
     []
+- !<ScriptComponent/52283062-df98-45d1-ab47-dc9b86d3e19b>
+  PrefabRemaps:
+    []
+  Name: DimensionOverlay
+  Enabled: true
+  ScriptAsset: !<reference> 82fd55b4-3c7e-4cb7-8216-ed82ea99dbda
+  ScriptInputsDefault:
+    modelLoaderObject: true
+    labelSizeCm: true
+    cameraObject: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      modelLoaderObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      lineMaterial: !<reference.Material> b7f284bd-a00a-4139-bdbe-edc53aad64ec
+      visibleAtStart: true
+      labelSizeCm: !<float> 2.000000
+      cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/541a1667-fb17-43bf-bd3b-7b713063d3f7>
   PrefabRemaps:
     []
@@ -1804,6 +1794,26 @@
     - !<own> cca13a50-a590-4864-94ca-c7b3aa5951ed
   Components:
     []
+- !<SceneObject/827b8617-0291-434e-a9da-b637e42b2c49>
+  PrefabRemaps:
+    []
+  Name: HoloCAD
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> ddd8df53-930f-4893-8022-783ba9ce9074
+    - !<own> 11cd9c4e-3370-49e2-a55a-8e738ba1aedb
+    - !<own> 34d2b270-6f7f-42e2-baf2-943c2ed0a42a
+    - !<own> 52283062-df98-45d1-ab47-dc9b86d3e19b
+    - !<own> e124d13e-a4fe-4953-b76a-cd02c9ee968b
+    - !<own> aa20c599-aa78-49b6-87dd-fea34a86a2c7
 - !<SceneObject/85b990fe-4a77-4e85-b87e-28981b812dd8>
   PrefabRemaps:
     []
@@ -1819,6 +1829,22 @@
     - !<own> 9a14c486-688a-4af4-a99a-084652f3efa1
   Components:
     []
+- !<SceneObject/868ee4cf-1754-41fb-8db5-622b31233581>
+  PrefabRemaps:
+    []
+  Name: HoloCAD Panel
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    - !<own> 24a140cf-33e0-42c6-8e29-7e66636c6214
+    - !<own> c13a2c2f-e234-4d39-a4f9-4102a018efc8
+  Components:
+    - !<own> 09845f2f-1940-4e67-bd58-823e51ca9f67
 - !<SceneObject/876856b0-0b08-4488-9e57-976a4ddd348f>
   PrefabRemaps:
     []
@@ -1999,6 +2025,30 @@
     []
   Components:
     - !<own> 329940fb-34dd-413d-8f14-ed6fa1f135b5
+- !<ScriptComponent/aa20c599-aa78-49b6-87dd-fea34a86a2c7>
+  PrefabRemaps:
+    []
+  Name: TunnelPairing
+  Enabled: true
+  ScriptAsset: !<reference> 59697595-056a-4dde-95b8-fca87d9ec48e
+  ScriptInputsDefault:
+    bridgeClientObject: true
+    askAtStart: true
+    remember: true
+    takeOver: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      bridgeClientObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      promptText: !<reference.Text> cc43f6a5-d82d-47aa-9f6e-d8dea695d153
+      askAtStart: true
+      remember: true
+      takeOver: true
+      words: declaration-disciplines-removing-lab
+  ScriptTypes:
+    "":
+      {}
 - !<ScriptComponent/ab22849e-ac61-44f6-a05a-705b1b8d329f>
   PrefabRemaps:
     []
@@ -2232,6 +2282,87 @@
   ScriptTypes:
     "":
       {}
+- !<Text/b4db85de-d264-4502-89de-411604f9b608>
+  PrefabRemaps:
+    []
+  Name: Text
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Text: Holo-CAD starting
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 44
+  Font: !<reference> 00000000-0000-0000-0000-000000000000
+  LayoutRect:
+    left: -7.500000
+    bottom: -2.250000
+    right: 7.500000
+    top: 2.250000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Overflow
+  Fill: !<TextFill>
+    Mode: Solid
+    Color: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    Texture: !<reference> 00000000-0000-0000-0000-000000000000
+    ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    TileCount: 5.000000
+    TileZone: Rect
+    TextureStretch: FitWidth
+  BlendMode: PremultipliedAlpha
+  Outline: !<OutlineSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Size: 0.250000
+  Dropshadow: !<DropshadowSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    OffsetX: 0.250000
+    OffsetY: 0.250000
+  Background: !<BackgroundSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Margins:
+      left: 0.000000
+      bottom: 0.000000
+      right: 0.000000
+      top: 0.000000
+    CornerRadius: 0.000000
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.000000
+    CapitalizationOverride: None
+  DepthTest: false
+  TwoSided: false
 - !<SceneObject/b6967747-d54d-4fdf-b8cc-652d7e6080ba>
   PrefabRemaps:
     []
@@ -2292,6 +2423,21 @@
     - !<own> ed7074f4-802d-4336-9588-237c5c48f33e
   Components:
     []
+- !<SceneObject/c13a2c2f-e234-4d39-a4f9-4102a018efc8>
+  PrefabRemaps:
+    []
+  Name: HoloCAD Status
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: -6.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> b4db85de-d264-4502-89de-411604f9b608
 - !<SceneObject/c1e4cdd6-40ff-4bbf-94e2-490af58b9b1d>
   PrefabRemaps:
     []
@@ -2456,6 +2602,87 @@
     - !<own> 2fa6895d-6663-4624-9e74-6b038b982135
   Components:
     []
+- !<Text/cc43f6a5-d82d-47aa-9f6e-d8dea695d153>
+  PrefabRemaps:
+    []
+  Name: Text
+  Enabled: true
+  RenderOrder: 0
+  StretchMode: Stretch
+  VerticalAlignment: Center
+  HorizontalAlignment: Center
+  MeshShadowMode: None
+  ShadowColor: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+  ShadowDensity: 1.000000
+  Text: Holo-CAD starting
+  Editable: false
+  ShowEditingPreview: true
+  TouchHandler: !<reference> 00000000-0000-0000-0000-000000000000
+  SizeToFit: false
+  FontSize: 56
+  Font: !<reference> 00000000-0000-0000-0000-000000000000
+  LayoutRect:
+    left: -7.500000
+    bottom: -2.250000
+    right: 7.500000
+    top: 2.250000
+  OverflowVertical: Overflow
+  OverflowHorizontal: Overflow
+  Fill: !<TextFill>
+    Mode: Solid
+    Color: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    Texture: !<reference> 00000000-0000-0000-0000-000000000000
+    ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+    TileCount: 5.000000
+    TileZone: Rect
+    TextureStretch: FitWidth
+  BlendMode: PremultipliedAlpha
+  Outline: !<OutlineSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Size: 0.250000
+  Dropshadow: !<DropshadowSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    OffsetX: 0.250000
+    OffsetY: 0.250000
+  Background: !<BackgroundSettings>
+    Enabled: false
+    Fill: !<TextFill>
+      Mode: Solid
+      Color: {x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000}
+      Texture: !<reference> 00000000-0000-0000-0000-000000000000
+      ColorTint: {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}
+      TileCount: 5.000000
+      TileZone: Rect
+      TextureStretch: FitWidth
+    Margins:
+      left: 0.000000
+      bottom: 0.000000
+      right: 0.000000
+      top: 0.000000
+    CornerRadius: 0.000000
+  AdvancedLayout: !<TextAdvancedLayout>
+    ExtentsTarget: !<reference> 00000000-0000-0000-0000-000000000000
+    LetterSpacing: 0.000000
+    LineSpacing: 1.000000
+    CapitalizationOverride: None
+  DepthTest: false
+  TwoSided: false
 - !<SceneObject/cc851f59-7d95-4dbe-a9c0-c336f5593682>
   PrefabRemaps:
     []
@@ -2661,6 +2888,25 @@
     - !<own> 7db11996-f25b-413e-b374-c4db27bbfc7e
   Components:
     []
+- !<ScriptComponent/ddd8df53-930f-4893-8022-783ba9ce9074>
+  PrefabRemaps:
+    []
+  Name: BridgeClient
+  Enabled: true
+  ScriptAsset: !<reference> 34b49d7c-5f20-4a49-b9ff-30114ec33638
+  ScriptInputsDefault:
+    pingSeconds: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      bridgeUrl: "wss://type-the-words-from-freecad.trycloudflare.com/ws"
+      internetModule: !<reference.InternetModule> 591e200c-a1ef-4fb4-abd6-c084b00ac7fc
+      verbose: true
+      pingSeconds: !<float> 15.000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/dfaad098-318f-4c37-a06b-b85501a6dd79>
   PrefabRemaps:
     []
@@ -2706,6 +2952,23 @@
     - !<own> 7e21254a-b32b-4815-a071-879538aa3a51
   Components:
     []
+- !<ScriptComponent/e124d13e-a4fe-4953-b76a-cd02c9ee968b>
+  PrefabRemaps:
+    []
+  Name: StatusPanel
+  Enabled: true
+  ScriptAsset: !<reference> e8bbddfb-848d-458e-80f4-fa197c7e59a4
+  ScriptInputsDefault:
+    sourceObject: true
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      statusText: !<reference.Text> b4db85de-d264-4502-89de-411604f9b608
+      sourceObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/e1c330dd-cf96-4076-86ec-8b3625cb7a61>
   PrefabRemaps:
     []

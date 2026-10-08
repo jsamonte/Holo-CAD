@@ -113,6 +113,24 @@ def main() -> int:
     check("RFC 6455 test vector", accept == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
           "got {0}".format(accept))
 
+    print("model urls follow the address each lens arrived on")
+    # The bug this guards: FreeCAD served a LAN url while the lens had
+    # reached it through a tunnel, so every model announcement pointed at
+    # an address the lens was not allowed to fetch, and nothing appeared.
+    check("a tunnel host replaces the lan one",
+          hs.rewrite_host("http://192.168.1.56:8765/models/Body/1.glb",
+                          "https://four-words.trycloudflare.com")
+          == "https://four-words.trycloudflare.com/models/Body/1.glb")
+    check("the path is kept exactly",
+          hs.rewrite_host("http://a/models/x%20y/9.glb", "https://b")
+          == "https://b/models/x%20y/9.glb")
+    check("no base means no change",
+          hs.rewrite_host("http://a/models/x/1.glb", "")
+          == "http://a/models/x/1.glb")
+    check("a trailing slash on the base does not double up",
+          hs.rewrite_host("http://a/models/x/1.glb", "https://b/")
+          == "https://b/models/x/1.glb")
+
     print("store")
     store = hs.ModelStore(keep=2)
     for version in (1, 2, 3):

@@ -169,10 +169,55 @@ def main() -> int:
     names = sorted(o.Name for o in chosen)
     check("nothing selected takes every visible solid",
           "Cube" in names and "Slab" in names, str(names))
-    check("a container is not exported alongside its contents",
-          "Assembly" not in names, str(names))
+    # Reversed deliberately. A container is now kept and its contents
+    # dropped, because the old way exported an intermediate PartDesign
+    # feature rather than the finished Body.
+    check("a container is exported instead of its contents",
+          "Assembly" in names and "Inner" not in names, str(names))
     chosen = exporter.collect_objects(doc, selection=[box])
     check("an explicit selection wins", [o.Name for o in chosen] == ["Cube"])
+
+    print("what a real PartDesign document drags along")
+    # The failure this guards: with nothing selected, a document full of
+    # origin axes, datum planes and sketches exported none of them and
+    # reported "every object tessellated to nothing", because all of them
+    # have a Shape and none has any triangles.
+    sketch = doc.addObject("Sketcher::SketchObject", "Sketch")
+    plane = doc.addObject("App::Plane", "XY_Plane")
+    line = doc.addObject("App::Line", "X_Axis")
+    doc.recompute()
+    check("a sketch is not renderable", not exporter.has_renderable_shape(sketch))
+    check("a datum plane is not renderable, despite having a face",
+          not exporter.has_renderable_shape(plane))
+    check("an origin axis is not renderable",
+          not exporter.has_renderable_shape(line))
+    check("a solid is renderable", exporter.has_renderable_shape(box))
+
+    chosen = exporter.collect_objects(doc)
+    names = sorted(o.Name for o in chosen)
+    check("none of them are picked up",
+          not any(n in names for n in ("Sketch", "XY_Plane", "X_Axis")),
+          str(names))
+    check("the solids still are", "Cube" in names and "Slab" in names, str(names))
+
+    print("selecting something with no surfaces says so")
+    try:
+        exporter.collect_objects(doc, selection=[sketch])
+        check("a sketch only selection is refused", False, "it did not raise")
+    except exporter.ExportError as e:
+        check("a sketch only selection is refused", "no surfaces" in str(e),
+              str(e))
+
+    print("a container wins over its contents")
+    holder = doc.addObject("App::Part", "Holder")
+    inner_box = doc.addObject("Part::Box", "Held")
+    inner_box.Length = inner_box.Width = inner_box.Height = 30
+    holder.addObject(inner_box)
+    doc.recompute()
+    chosen = exporter.collect_objects(doc, selection=[holder, inner_box])
+    names = [o.Name for o in chosen]
+    check("the container is kept, not the part inside it",
+          names == ["Holder"], str(names))
 
     print("refusals")
     try:

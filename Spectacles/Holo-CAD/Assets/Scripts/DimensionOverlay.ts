@@ -262,7 +262,6 @@ ${factor.toFixed(2)}x true size, tap to reset`
     }
     const collider = object.createComponent("Physics.ColliderComponent")
     collider.debugDrawEnabled = false
-    collider.intangible = true
     const box = Shape.createBoxShape()
     box.size = new vec3(
       Math.max(widthCm, this.labelSizeCm * 8),

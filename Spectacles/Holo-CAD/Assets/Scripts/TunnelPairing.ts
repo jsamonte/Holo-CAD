@@ -20,6 +20,11 @@
 
 import {BridgeClient} from "./BridgeClient"
 
+// Required for the keyboard to exist at all. Having the TextInputModule
+// asset in the project is not enough: without this require, requestKeyboard
+// does nothing and says nothing.
+require("LensStudio:TextInputModule")
+
 const TAG = "HoloCAD TunnelPairing"
 const SUFFIX = ".trycloudflare.com"
 const STORE_KEY = "holocad.tunnel.words"
@@ -44,10 +49,30 @@ export class TunnelPairing extends BaseScriptComponent {
   @hint("Remember the words between sessions.")
   remember: boolean = true
 
+  @input
+  @hint("Supply the address instead of BridgeClient's. Turn off for a local network build.")
+  takeOver: boolean = true
+
+  @input
+  @hint("Words typed here are used instead of asking. The keyboard never appears in the Spectacles preview, so this is how to test there.")
+  words: string = ""
+
   private bridge: BridgeClient | null = null
-  private words: string = ""
+  private current: string = ""
+  private failures: number = 0
 
   onAwake(): void {
+    // Claim the BridgeClient before anything starts. Every onAwake runs
+    // before any OnStartEvent, so this is the one moment where the client
+    // can be stopped from dialling the inspector's address first and
+    // reporting a failure that has nothing to do with the real setup.
+    if (this.takeOver) {
+      const host = this.bridgeClientObject ?? this.getSceneObject()
+      const client = host.getComponent(BridgeClient.getTypeName())
+      if (client !== null) {
+        client.holdForPairing()
+      }
+    }
     this.createEvent("OnStartEvent").bind(() => this.start())
   }
 
@@ -59,13 +84,26 @@ export class TunnelPairing extends BaseScriptComponent {
       return
     }
 
+    // Set in the inspector, this wins. The keyboard does not appear in the
+    // Spectacles preview at all, so without this there is no way to try the
+    // tunnel path anywhere but on the glasses.
+    const fromInspector = this.clean(this.words)
+    if (fromInspector.length > 0) {
+      print(`${TAG}: using the words set in the inspector, "${fromInspector}"`)
+      this.apply(fromInspector)
+      return
+    }
+
     const stored = this.load()
     if (stored.length > 0) {
       print(`${TAG}: reusing stored words "${stored}"`)
       this.apply(stored)
       return
     }
-    this.show("No FreeCAD yet.\nType the words FreeCAD shows.")
+    this.show(
+      "No FreeCAD yet.\n\nIn FreeCAD press Share over the internet,\n" +
+        "then type the words it shows."
+    )
     if (this.askAtStart) {
       this.ask()
     }
@@ -87,9 +125,9 @@ export class TunnelPairing extends BaseScriptComponent {
     options.keyboardType = TextInputSystem.KeyboardType.Text
     options.returnKeyType = TextInputSystem.ReturnKeyType.Done
     options.enablePreview = true
-    options.initialText = this.words
+    options.initialText = this.current
 
-    let typed = this.words
+    let typed = this.current
     options.onTextChanged = (text: string) => {
       typed = text
       this.show(`${this.clean(text)}${SUFFIX}`)
@@ -105,8 +143,11 @@ export class TunnelPairing extends BaseScriptComponent {
       this.apply(cleaned)
     }
     options.onKeyboardStateChanged = (open: boolean) => {
-      if (!open && this.words.length === 0) {
-        this.show("No FreeCAD yet.\nType the words FreeCAD shows.")
+      if (!open && this.current.length === 0) {
+        this.show(
+          "No FreeCAD yet.\n\nIn FreeCAD press Share over the internet,\n" +
+            "then type the words it shows."
+        )
       }
     }
 
@@ -150,8 +191,58 @@ export class TunnelPairing extends BaseScriptComponent {
     return kept
   }
 
+  /**
+   * Give up on an address that keeps refusing, rather than retrying it
+   * forever behind a message nobody can act on.
+   *
+   * A tunnel hostname dies whenever sharing is stopped or FreeCAD's tunnel
+   * is replaced, and the lens would otherwise sit reconnecting to a name
+   * Cloudflare answers with an error. Three failures is enough to be sure
+   * it is not a passing blip.
+   */
+  private watchForDeadAddress(): void {
+    if (this.bridge === null) {
+      return
+    }
+    this.bridge.onStatus.add((status) => {
+      if (status.state === "connected") {
+        this.failures = 0
+        return
+      }
+      if (status.state !== "retrying" && status.state !== "failed") {
+        return
+      }
+      this.failures++
+      if (this.failures < 3) {
+        return
+      }
+      this.failures = 0
+      print(`${TAG}: ${this.current}${SUFFIX} is not answering, forgetting it`)
+      this.show(
+        `${this.current}${SUFFIX}\nis not answering.\n\n` +
+          "Press Share over the internet in FreeCAD\nand type the new words."
+      )
+      this.forgetStored()
+      this.ask()
+    })
+  }
+
+  /** Drop the remembered words without reopening the keyboard. */
+  private forgetStored(): void {
+    if (!this.remember) {
+      return
+    }
+    try {
+      global.persistentStorageSystem.store.remove(STORE_KEY)
+    } catch (e) {
+      print(`${TAG}: could not clear the stored words: ${e}`)
+    }
+  }
+
   private apply(words: string): void {
-    this.words = words
+    this.current = words
+    this.failures = 0
+    this.watchForDeadAddress()
     const url = `wss://${words}${SUFFIX}/ws`
     print(`${TAG}: connecting to ${url}`)
     this.show(`${words}${SUFFIX}\nconnecting`)
@@ -163,7 +254,7 @@ export class TunnelPairing extends BaseScriptComponent {
 
   /** Forget the stored words and ask again. Wire this to a button. */
   forget(): void {
-    this.words = ""
+    this.current = ""
     if (this.remember) {
       try {
         global.persistentStorageSystem.store.remove(STORE_KEY)
