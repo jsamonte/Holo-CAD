@@ -406,6 +406,9 @@ export class ModelPlacement extends BaseScriptComponent {
       transform.setLocalRotation(quat.quatIdentity())
       transform.setLocalScale(new vec3(1, 1, 1))
     })
+    // Back to where the addon said each part belongs, which is what makes
+    // the assembly the right shape again after parts have been dragged.
+    this.loader.restoreOffsets()
     this.loader.resetAssembly()
     this.loader.replaceAll()
     this.shown.forEach((_shown, id) => this.reportScale(id))
@@ -428,6 +431,7 @@ export class ModelPlacement extends BaseScriptComponent {
     this.shown.forEach((shown) => {
       shown.root.getTransform().setLocalRotation(quat.quatIdentity())
     })
+    this.loader.restoreOffsets()
     this.loader.replaceAll()
     this.fitAssemblyCollider()
     print(`${TAG}: everything brought back in front of you`)

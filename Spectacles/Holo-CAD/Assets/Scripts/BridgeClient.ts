@@ -42,6 +42,15 @@ export type ModelUpdate = {
    * list instead. Empty means leave the template material alone.
    */
   colours: number[][]
+  /**
+   * Where this part sits inside the send, in the lens's own axes and in
+   * millimetres, relative to the whole send's bottom centre.
+   *
+   * The addon works this out, because only it knows the other parts. Each
+   * part's mesh is written about its own origin, so without this every part
+   * of an assembly would arrive stacked on the same spot.
+   */
+  offset_mm: vec3
   pushed_ms?: number
   bytes?: number
   /** Seconds on the lens clock when this message arrived. */
@@ -395,6 +404,7 @@ export class BridgeClient extends BaseScriptComponent {
       },
       triangles: Number(raw.triangles) || 0,
       colours: BridgeClient.parseColours(raw.colours),
+      offset_mm: BridgeClient.parseOffset(raw.offset_mm),
       pushed_ms: typeof raw.pushed_ms === "number" ? raw.pushed_ms : undefined,
       bytes: typeof raw.bytes === "number" ? raw.bytes : undefined,
       receivedAt: getTime()
@@ -409,6 +419,22 @@ export class BridgeClient extends BaseScriptComponent {
    * the template material looks like a rendering bug rather than bad input,
    * and an older addon that sends no colours at all is a case to support.
    */
+  /** An offset as a vec3, defaulting to the origin. */
+  private static parseOffset(raw: any): vec3 {
+    if (!Array.isArray(raw) || raw.length < 3) {
+      return vec3.zero()
+    }
+    const out = []
+    for (let i = 0; i < 3; i++) {
+      const value = Number(raw[i])
+      if (!isFinite(value)) {
+        return vec3.zero()
+      }
+      out.push(value)
+    }
+    return new vec3(out[0], out[1], out[2])
+  }
+
   private static parseColours(raw: any): number[][] {
     if (!Array.isArray(raw)) {
       return []

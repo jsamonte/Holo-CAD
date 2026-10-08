@@ -56,6 +56,23 @@ OP_PING = 0x9
 OP_PONG = 0xA
 
 
+def _clean_offset(offset):
+    """An offset as three plain floats, or zeros.
+
+    Zeros rather than nothing, so the lens always has a position to use and
+    never has to decide between an absent offset and a central one.
+    """
+    if not offset:
+        return [0.0, 0.0, 0.0]
+    try:
+        values = [float(v) for v in offset]
+    except (TypeError, ValueError):
+        return [0.0, 0.0, 0.0]
+    if len(values) != 3 or not all(v == v and abs(v) != float("inf") for v in values):
+        return [0.0, 0.0, 0.0]
+    return values
+
+
 def _clean_colours(colours):
     """Colours as plain [r, g, b, a] floats clamped to 0..1, or [].
 
@@ -333,7 +350,7 @@ class Bridge:
     # ---- the one call the addon makes ----
 
     def publish(self, model_id: str, glb: bytes, bbox_mm, scale=None, triangles=0,
-                colours=None) -> dict:
+                colours=None, offset_mm=None) -> dict:
         """Store a GLB and tell every connected lens about it.
 
         bbox_mm is the true size in millimetres, which is what the lens
@@ -366,6 +383,9 @@ class Bridge:
             },
             "triangles": int(triangles),
             "colours": _clean_colours(colours),
+            # Where this part sits inside the send, in the lens's axes and in
+            # millimetres. Zero for a single model, which is its own origin.
+            "offset_mm": _clean_offset(offset_mm),
             "pushed_ms": int(time.time() * 1000),
             "bytes": len(glb),
         }

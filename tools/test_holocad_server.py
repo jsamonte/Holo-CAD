@@ -139,6 +139,18 @@ def main() -> int:
           dead.send_text("{}") is False)
     check("and marks it closed", dead.closed is True)
 
+    print("offsets are cleaned before they go out")
+    check("three floats survive",
+          hs._clean_offset([1.5, -2.0, 3.0]) == [1.5, -2.0, 3.0])
+    check("no offset is the origin, not None",
+          hs._clean_offset(None) == [0.0, 0.0, 0.0])
+    check("a wrong length is refused",
+          hs._clean_offset([1.0, 2.0]) == [0.0, 0.0, 0.0])
+    check("rubbish is refused",
+          hs._clean_offset(["a", "b", "c"]) == [0.0, 0.0, 0.0])
+    check("an infinity is refused, since it would throw the part into space",
+          hs._clean_offset([float("inf"), 0.0, 0.0]) == [0.0, 0.0, 0.0])
+
     print("colours are cleaned before they go out")
     check("a plain rgba list survives",
           hs._clean_colours([[0.1, 0.2, 0.3, 1.0]]) == [[0.1, 0.2, 0.3, 1.0]])

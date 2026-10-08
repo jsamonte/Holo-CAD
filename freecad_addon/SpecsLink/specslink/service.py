@@ -187,10 +187,17 @@ def send(objs=None, doc=None, force=False) -> list:
     per_body = bool(settings.get("PerBody"))
     groups = [[obj] for obj in chosen] if per_body else [chosen]
 
+    # One origin for the whole send, so every part reports where it sits
+    # relative to the same point and the lens can rebuild the assembly.
+    # Without this each part was centred on itself and they all arrived on
+    # top of one another.
+    origin_mm = exporter.bottom_centre_mm(exporter.bounding_box_doc(chosen))
+
     sent = []
     unchanged = 0
     for group in groups:
-        result = exporter.export(group, quality=quality, prefer_stock=prefer_stock)
+        result = exporter.export(group, quality=quality, prefer_stock=prefer_stock,
+                                 origin_mm=origin_mm)
         digest = _digest(result["glb"], scale)
         slug = holocad_server.slugify(result["id"])
         if not force and _digests.get(slug) == digest:
@@ -203,6 +210,7 @@ def send(objs=None, doc=None, force=False) -> list:
             scale=scale,
             triangles=result["triangles"],
             colours=result.get("colours"),
+            offset_mm=result.get("offset_mm"),
         )
         _digests[metadata["id"]] = digest
         sent.append(metadata)
@@ -216,6 +224,7 @@ def send(objs=None, doc=None, force=False) -> list:
                 "scale": metadata["scale"],
                 "triangles": metadata["triangles"],
                 "colours": metadata["colours"],
+                "offset_mm": metadata["offset_mm"],
             })
         bbox = result["bbox_mm"]
         log(

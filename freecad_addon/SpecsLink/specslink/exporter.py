@@ -200,15 +200,54 @@ def global_shape(obj):
     return shape
 
 
-def bounding_box_mm(objs) -> tuple:
-    """True size in millimetres, from the globally placed shapes."""
+def shape_box(shape):
+    """The tightest axis aligned box around what will actually be drawn.
+
+    Shape.BoundBox is only an estimate for curved geometry, and it can be a
+    wild one: it is derived from the underlying surfaces rather than the
+    trimmed faces, so a mask built from three trimmed spherical faces
+    reported 78.6 x 103.9 x 141.0 mm while the part is really
+    31.4 x 53.3 x 54.7. Reporting that as the true size made the lens scale
+    the part to a third of its size and warn that the proportions did not
+    match, which is exactly what it should have done: the size was wrong.
+
+    optimalBoundingBox measures the triangulation instead, which is both
+    tight and the same thing the mesh is built from. It can fail or be slow
+    on awkward geometry, so the estimate stays as a fallback.
+    """
+    try:
+        return shape.optimalBoundingBox(True)
+    except Exception:
+        return shape.BoundBox
+
+
+def bounding_box_doc(objs):
+    """The combined tight box of objs, in document millimetres."""
     box = None
     for obj in objs:
-        shape_box = global_shape(obj).BoundBox
-        box = shape_box if box is None else box.united(shape_box)
+        each = shape_box(global_shape(obj))
+        box = each if box is None else box.united(each)
     if box is None:
         raise ExportError("no shapes to measure")
+    return box
+
+
+def bounding_box_mm(objs) -> tuple:
+    """True size in millimetres, from the globally placed shapes."""
+    box = bounding_box_doc(objs)
     return (box.XLength, box.YLength, box.ZLength)
+
+
+def bottom_centre_mm(box):
+    """The point a model is hung from: centred in X and Y, bottom in Z.
+
+    Matches what the lens used to work out for itself by measuring the
+    loaded mesh, which is why models now arrive already sitting on this
+    point rather than needing to be recentred after the fact.
+    """
+    return ((box.XMin + box.XMax) / 2.0,
+            (box.YMin + box.YMax) / 2.0,
+            box.ZMin)
 
 
 def object_colour(obj):
@@ -227,16 +266,28 @@ def object_colour(obj):
 # ------------------------------------------------------------------- glTF
 
 
+def _shifted(point, shift):
+    return (point[0] - shift[0], point[1] - shift[1], point[2] - shift[2])
+
+
 def to_gltf_space(x_mm, y_mm, z_mm):
     """Millimetres Z up to metres Y up, which is a -90 degree turn about X."""
     return (x_mm / 1000.0, z_mm / 1000.0, -y_mm / 1000.0)
 
 
-def tessellate(obj, linear, angular):
+def tessellate(obj, linear, angular, shift=(0.0, 0.0, 0.0)):
     """(positions, normals, indices) for one object, flat shaded.
 
     Each facet gets its own three vertices so edges stay hard, which is what
     a machined part should look like.
+
+    shift is subtracted from every vertex, in glTF space. It is how the mesh
+    ends up written about its own bottom centre instead of about the
+    document origin. That matters more than it looks: the lens measures the
+    loaded mesh to work out the file's units, and its measurement includes
+    the origin, so a part modelled 130 mm away from the document origin
+    measured as 130 mm across however small it really was. Writing the mesh
+    around the origin makes the measurement right by construction.
     """
     import MeshPart
 
@@ -252,7 +303,8 @@ def tessellate(obj, linear, angular):
     indices = []
     for facet in facets:
         corners = [points[i] for i in facet]
-        a, b, c = [to_gltf_space(p.x, p.y, p.z) for p in corners]
+        a, b, c = [_shifted(to_gltf_space(p.x, p.y, p.z), shift)
+                   for p in corners]
         # Winding is preserved by the coordinate change, since it is a
         # rotation and not a mirror.
         ux, uy, uz = b[0] - a[0], b[1] - a[1], b[2] - a[2]
@@ -371,13 +423,13 @@ def build_glb(parts) -> bytes:
 # ---------------------------------------------------------------- exporters
 
 
-def export_fallback(objs, quality=DEFAULT_QUALITY) -> tuple:
+def export_fallback(objs, quality=DEFAULT_QUALITY, shift=(0.0, 0.0, 0.0)) -> tuple:
     """(glb bytes, triangle count). Works with or without the GUI."""
     linear, angular = QUALITY.get(quality, QUALITY[DEFAULT_QUALITY])
     parts = []
     triangles = 0
     for obj in objs:
-        positions, normals, indices = tessellate(obj, linear, angular)
+        positions, normals, indices = tessellate(obj, linear, angular, shift)
         triangles += len(indices) // 3
         parts.append((obj.Label or obj.Name, positions, normals, indices,
                       object_colour(obj)))
@@ -409,31 +461,58 @@ def export_stock(objs) -> tuple:
     return glb, 0
 
 
-def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False) -> dict:
+def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False,
+           origin_mm=None) -> dict:
     """Export objs and report what happened.
 
-    Returns id, glb, bbox_mm, triangles and which exporter produced it.
+    Returns id, glb, bbox_mm, triangles, colours, offset_mm and which
+    exporter produced it.
+
+    origin_mm is the document point the whole send is measured from, as
+    (x, y, z) in document millimetres. With it, every part is written
+    about its own bottom centre and reports where that sits relative to
+    that shared origin, which is what lets the lens rebuild an assembly
+    in the right shape. Each part used to carry its document position
+    baked into its vertices and then be recentred by the lens, so in per
+    body mode every part was recentred separately and they all landed on
+    top of each other.
     """
     if not objs:
         raise ExportError("nothing to export")
 
-    bbox = bounding_box_mm(objs)
+    box = bounding_box_doc(objs)
+    bbox = (box.XLength, box.YLength, box.ZLength)
     if max(bbox) <= 0:
         raise ExportError("the selection measures zero in every direction")
+
+    centre = bottom_centre_mm(box)
+    shift = to_gltf_space(*centre)
+    # Where this part hangs, in the lens's own axes and in millimetres,
+    # so the lens never has to redo the Z up to Y up turn.
+    origin = origin_mm if origin_mm is not None else centre
+    offset_mm = [
+        centre[0] - origin[0],
+        centre[2] - origin[2],
+        -(centre[1] - origin[1]),
+    ]
 
     used = "fallback"
     if prefer_stock:
         try:
             glb, triangles = export_stock(objs)
             used = "stock"
+            # The stock exporter writes its own vertices, so nothing
+            # here can centre them. Report no offset rather than a
+            # wrong one.
+            offset_mm = [0.0, 0.0, 0.0]
         except ExportError as e:
             FreeCAD.Console.PrintWarning(
                 "Holo-CAD: stock exporter unavailable, tessellating instead. "
                 "{0}\n".format(e)
             )
-            glb, triangles = export_fallback(objs, quality)
+            glb, triangles = export_fallback(objs, quality, shift)
     else:
-        glb, triangles = export_fallback(objs, quality)
+        glb, triangles = export_fallback(objs, quality, shift)
 
     doc = objs[0].Document
     name = objs[0].Label if len(objs) == 1 else (doc.Label if doc else "model")
@@ -450,4 +529,5 @@ def export(objs, quality=DEFAULT_QUALITY, prefer_stock=False) -> dict:
         # the importer. In the same order as objs, which is the order
         # build_glb writes the meshes in.
         "colours": [[round(c, 6) for c in object_colour(obj)] for obj in objs],
+        "offset_mm": [round(v, 6) for v in offset_mm],
     }

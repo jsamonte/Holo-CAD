@@ -247,6 +247,75 @@ def main() -> int:
           all(close(v, 100.0, 0.5) for v in curved["bbox_mm"]),
           str(curved["bbox_mm"]))
 
+    print("each part is written about its own origin, and says where it belongs")
+    # This is what stopped an assembly arriving in a heap. Every part used
+    # to carry its document position in its vertices and then be recentred
+    # by the lens, separately, so they all ended up on the same spot. And
+    # the lens measures a box that also contains the origin, so a part
+    # modelled far from the document origin measured as that distance
+    # across however small it really was.
+    far = doc.addObject("Part::Box", "FarAway")
+    far.Length, far.Width, far.Height = 10, 10, 10
+    far.Placement.Base = FreeCAD.Vector(500, 300, 200)
+    doc.recompute()
+
+    lone = exporter.export([far])
+    gltf_far, _ = read_glb(lone["glb"])
+    extent = measured_extent(gltf_far)
+    check("a part far from the origin still measures its own size",
+          all(close(v, 0.01, 1e-6) for v in extent), str(extent))
+    # The lens's box includes the origin, so this is the number that matters.
+    lo = [min(0.0, gltf_far["accessors"][p["attributes"]["POSITION"]]["min"][a])
+          for p in gltf_far["meshes"][0]["primitives"] for a in range(3)]
+    hi = [max(0.0, gltf_far["accessors"][p["attributes"]["POSITION"]]["max"][a])
+          for p in gltf_far["meshes"][0]["primitives"] for a in range(3)]
+    span = max(hi[i] - lo[i] for i in range(3))
+    check("and still measures it once the origin is included",
+          close(span, 0.01, 1e-6), str(span))
+    check("a lone part reports no offset",
+          all(close(v, 0.0) for v in lone["offset_mm"]), str(lone["offset_mm"]))
+
+    origin = exporter.bottom_centre_mm(exporter.bounding_box_doc([box, far]))
+    near = exporter.export([box], origin_mm=origin)
+    away = exporter.export([far], origin_mm=origin)
+    check("two parts report different offsets",
+          near["offset_mm"] != away["offset_mm"],
+          "{0} vs {1}".format(near["offset_mm"], away["offset_mm"]))
+    # The gap is between their bottom centres, not their placements, and
+    # the two cubes are different sizes. The 100 mm cube sits at the origin,
+    # so its bottom centre is (50, 50, 0); the 10 mm cube is placed at
+    # (500, 300, 200), so its bottom centre is (505, 305, 200). In document
+    # axes that is (455, 255, 200) apart.
+    #
+    # Lens axes: x is document x, y is document z, z is negative document y.
+    # So the same gap reads as (455, 200, -255).
+    check("the offset is the gap between their bottom centres, in lens axes",
+          close(away["offset_mm"][0] - near["offset_mm"][0], 455.0, 0.01)
+          and close(away["offset_mm"][1] - near["offset_mm"][1], 200.0, 0.01)
+          and close(away["offset_mm"][2] - near["offset_mm"][2], -255.0, 0.01),
+          "{0} vs {1}".format(near["offset_mm"], away["offset_mm"]))
+
+    print("a curved shape reports the size it is, not the size of its surfaces")
+    # Shape.BoundBox is only an estimate for curved geometry. A trimmed
+    # sphere reported the whole sphere, which made the lens scale the part
+    # down and warn that the proportions disagreed.
+    ball = doc.addObject("Part::Sphere", "Hemisphere")
+    ball.Radius = 50
+    ball.Angle1 = 0
+    doc.recompute()
+    loose = ball.Shape.BoundBox
+    tight = exporter.bounding_box_mm([ball])
+    check("the tight box is no larger than the estimate",
+          all(tight[i] <= (loose.XLength, loose.YLength, loose.ZLength)[i] + 1e-6
+              for i in range(3)),
+          "{0} vs {1}".format(tight, (loose.XLength, loose.YLength, loose.ZLength)))
+    hemi = exporter.export([ball])
+    gltf_h, _ = read_glb(hemi["glb"])
+    ext_h = measured_extent(gltf_h)
+    corr = (max(hemi["bbox_mm"]) / 10.0) / max(ext_h)
+    check("so the correction a curved part produces is still 100",
+          close(corr, 100.0, 1.0), "{0:.4f}".format(corr))
+
     print("colours are reported beside the model, and land in the GLB")
     # Headless there is no ViewObject, so object_colour falls back to its
     # default. That is the case worth pinning anyway: the lens must get a

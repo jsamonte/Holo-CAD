@@ -65,4 +65,4 @@
     - '// @input SceneObject cameraObject {"hint":"Camera used for the first placement. Leave empty to find the main camera."}'
     - '// @input float spawnDistanceCm = 50 {"hint":"How far in front of you a model first appears, in cm."}'
     - '// @input float spawnDropCm = 15 {"hint":"How far below eye level a model first appears, in cm."}'
-    - '// @input float axisTolerance = 0.01 {"hint":"Warn when the loaded proportions disagree with bbox_mm by more than this fraction."}'
+    - '// @input float axisTolerance = 0.03 {"hint":"Warn when the loaded proportions disagree with bbox_mm by more than this fraction."}'

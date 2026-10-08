@@ -86,6 +86,10 @@ def main() -> int:
               and all(0.0 <= v <= 1.0 for v in metadata["colours"][0]),
               str(metadata["colours"]))
 
+        check("a lone send sits at the origin",
+              metadata["offset_mm"] == [0.0, 0.0, 0.0],
+              str(metadata["offset_mm"]))
+
         update = client.read_json()
         check("the lens was told", update.get("type") == "model_update")
         check("same version as the publish", update["version"] == metadata["version"])
@@ -126,6 +130,19 @@ def main() -> int:
             message = client.read_json()
             seen[message["id"]] = message
         check("both announced", sorted(seen) == ["Bracket", "Plate"], str(sorted(seen)))
+        # The point of the offsets: in per body mode the two parts have to
+        # report different places to sit, or the lens stacks them on one
+        # spot and the assembly arrives in a heap.
+        offsets = {m["id"]: m["offset_mm"] for m in sent}
+        check("each part says where it belongs",
+              offsets["Bracket"] != offsets["Plate"], str(offsets))
+        check("and they are measured from a shared origin, so one of them "
+              "is not simply zero",
+              any(any(v != 0.0 for v in o) for o in offsets.values()),
+              str(offsets))
+        check("the lens hears the offsets too",
+              all(seen[k]["offset_mm"] == offsets[k] for k in offsets),
+              str({k: seen[k]["offset_mm"] for k in offsets}))
 
         again2 = service.send(doc=doc)
         check("nothing changed means nothing sent", again2 == [], str(again2))

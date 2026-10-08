@@ -57,6 +57,8 @@ export type ShownModel = {
   ratioLabel: string
   /** Seconds from the update arriving to the model being visible. */
   loadSeconds: number
+  /** Where this part belongs inside the assembly, in cm. */
+  offsetCm: vec3
 }
 
 type ModelEntry = {
@@ -65,7 +67,7 @@ type ModelEntry = {
   current: SceneObject | null
   currentVersion: number
   requestedVersion: number
-  placed: boolean
+  offsetCm: vec3
 }
 
 @component
@@ -110,7 +112,10 @@ export class ModelLoader extends BaseScriptComponent {
 
   @input
   @hint("Warn when the loaded proportions disagree with bbox_mm by more than this fraction.")
-  axisTolerance: number = 0.01
+  // 3%, not 1%: tessellating a 2.6 mm sphere into flat facets loses about
+  // 1.5% of its minor axes, so 1% warned about every small round feature
+  // and buried the one case worth seeing.
+  axisTolerance: number = 0.03
 
   /** Fired every time a model becomes visible, for the status panel. */
   readonly onModelShown = new Signal<ShownModel>()
@@ -123,6 +128,7 @@ export class ModelLoader extends BaseScriptComponent {
   private bridge: BridgeClient | null = null
   private entries: Map<string, ModelEntry> = new Map()
   private assembly: SceneObject | null = null
+  private assemblyPlaced: boolean = false
 
   onAwake(): void {
     this.createEvent("OnStartEvent").bind(() => this.start())
@@ -275,17 +281,30 @@ export class ModelLoader extends BaseScriptComponent {
     const requested = ModelLoader.requestedFactor(update, targetMaxMm)
     const finalScale = correction * requested
 
+    // The addon writes each mesh about its own bottom centre already, so
+    // the pivot stays at the origin. It used to be recentred here from the
+    // measured box, which in per body mode centred every part separately
+    // and dropped the whole assembly on one spot.
     const centre = box.min.add(box.max).uniformScale(0.5)
-    // Origin at bottom centre so the model sits flat on a surface.
-    pivot.getTransform().setLocalPosition(new vec3(-centre.x, -box.min.y, -centre.z))
+    if (!this.centredByAddon(update)) {
+      pivot.getTransform().setLocalPosition(
+        new vec3(-centre.x, -box.min.y, -centre.z))
+    }
     staging.getTransform().setLocalScale(new vec3(finalScale, finalScale, finalScale))
+
+    // Where the part belongs within the assembly. The offset arrives in
+    // millimetres, Lens Studio works in centimetres, and a model asked for
+    // at 1:10 has to be laid out at 1:10 too or the assembly comes apart.
+    const offsetCm = update.offset_mm.uniformScale(requested / 10)
+    entry.offsetCm = offsetCm
+    entry.root.getTransform().setLocalPosition(offsetCm)
 
     // Before it is revealed, so a part is never seen in the wrong colour.
     this.tint(pivot, update)
 
-    if (!entry.placed) {
-      this.placeInFrontOfUser(entry.root)
-      entry.placed = true
+    if (!this.assemblyPlaced) {
+      this.placeAssemblyInFrontOfUser()
+      this.assemblyPlaced = true
     }
 
     staging.enabled = true
@@ -318,8 +337,21 @@ export class ModelLoader extends BaseScriptComponent {
       correction: correction,
       requested: requested,
       ratioLabel: ratioLabel,
-      loadSeconds: loadSeconds
+      loadSeconds: loadSeconds,
+      offsetCm: offsetCm
     })
+  }
+
+  /**
+   * Whether the addon centred the mesh and told us where it belongs.
+   *
+   * An offset of exactly zero is the normal case for a single model, which
+   * is its own origin, so the test is whether the field arrived at all
+   * rather than whether it is non zero. An older addon sends neither, and
+   * those models still get recentred here.
+   */
+  private centredByAddon(update: ModelUpdate): boolean {
+    return update.offset_mm !== undefined && update.offset_mm !== null
   }
 
   // ---- colour ------------------------------------------------------------
@@ -361,7 +393,13 @@ export class ModelLoader extends BaseScriptComponent {
       const visual = visuals[i]
       try {
         const material = visual.mainMaterial.clone()
-        material.mainPass.baseColor = colour
+        if (!ModelLoader.setBaseColour(material, colour)) {
+          print(
+            `${TAG}: the material has no colour input, so ${update.id} cannot ` +
+              `be tinted. Assign a glTF material to ModelLoader's material input.`
+          )
+          return
+        }
         visual.clearMaterials()
         visual.addMaterial(material)
         applied++
@@ -374,6 +412,34 @@ export class ModelLoader extends BaseScriptComponent {
       `${TAG}: ${update.id} tinted ${applied} of ${visuals.length} mesh(es) ` +
         `from ${colours.length} colour(s)`
     )
+  }
+
+  /**
+   * Put a colour on a material, whichever colour input it happens to have.
+   *
+   * Materials differ in what they call this, and getting it wrong is silent:
+   * assigning an unknown property on a pass does nothing and raises nothing,
+   * so the part simply stays the template's colour. The project's own
+   * material is built from the glTF preset, whose input is
+   * baseColorFactor, matching the glTF spec. baseColor covers the Simple
+   * PBR materials. A material with neither, such as the Spectacles
+   * template's textured PBR graph, cannot be tinted at all, and that is
+   * worth saying out loud rather than leaving every part grey.
+   */
+  private static setBaseColour(material: any, colour: vec4): boolean {
+    const pass = material.mainPass
+    if (pass === undefined || pass === null) {
+      return false
+    }
+    if (pass.baseColorFactor !== undefined) {
+      pass.baseColorFactor = colour
+      return true
+    }
+    if (pass.baseColor !== undefined) {
+      pass.baseColor = colour
+      return true
+    }
+    return false
   }
 
   private static collectVisuals(object: SceneObject, into: any[]): void {
@@ -507,7 +573,7 @@ export class ModelLoader extends BaseScriptComponent {
       current: null,
       currentVersion: 0,
       requestedVersion: 0,
-      placed: false
+      offsetCm: vec3.zero()
     }
     this.entries.set(id, entry)
     return entry
@@ -621,12 +687,28 @@ export class ModelLoader extends BaseScriptComponent {
     return out
   }
 
-  /** Re-place every model that is currently loaded. */
+  /**
+   * Bring the assembly back in front of the user.
+   *
+   * Deliberately the assembly and not each part: the parts' own positions
+   * are the shape of the assembly, so re-placing them individually would
+   * collapse the model onto one point, which is the bug this replaced.
+   */
   replaceAll(): void {
+    this.placeAssemblyInFrontOfUser()
+    this.assemblyPlaced = true
+  }
+
+  /** Put each part back where the addon said it belongs. */
+  restoreOffsets(): void {
     this.entries.forEach((entry) => {
-      this.placeInFrontOfUser(entry.root)
-      entry.placed = true
+      entry.root.getTransform().setLocalPosition(entry.offsetCm)
     })
+  }
+
+  /** Place the whole assembly where it can be seen, once. */
+  placeAssemblyInFrontOfUser(): void {
+    this.placeInFrontOfUser(this.assemblyRoot())
   }
 
   private findBridgeClient(): BridgeClient | null {

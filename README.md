@@ -183,7 +183,9 @@ assembly, and deleting one removes it from the glasses.
 - Both panels can be **dragged** wherever you want them.
 
 Parts arrive in the colours FreeCAD gives them, one colour per body, taken
-from the object's Shape colour.
+from the object's Shape colour. A multi body document keeps its shape: every
+part is positioned relative to the others, so an assembly arrives as an
+assembly rather than as a pile on one spot.
 
 ### The controls panel
 
@@ -274,8 +276,22 @@ HoloCAD ModelLoader: test_cube v12 shown at 1:1  size 100.0 x 100.0 x 100.0 mm
     (true 100.0 x 100.0 x 100.0 mm)  correction 100.0000  meshes 1  load 303 ms
 ```
 
-The lens compares sorted dimensions and warns past 1%, which catches a dropped
-placement without firing on the Z-up to Y-up axis swap.
+The lens compares sorted dimensions and warns past 3%, which catches a dropped
+placement without firing on the Z-up to Y-up axis swap or on the few percent
+that tessellating a tiny sphere into flat facets costs.
+
+Two things the addon does so that the measurement can be trusted.
+
+It reports the **tight** bounding box, from `optimalBoundingBox`, not
+`Shape.BoundBox`. The latter is only an estimate for curved geometry and can
+be a wild one: a mask built from three trimmed spherical faces reported
+78.6 x 103.9 x 141.0 mm while the part is really 31.4 x 53.3 x 54.7, which
+made the lens draw it at a third of its size.
+
+And it writes each part's mesh **about that part's own bottom centre**, then
+says separately where that point belongs. The lens measures a box that also
+contains the origin, so a part modelled 130 mm from the document origin used
+to measure 130 mm across however small it really was.
 
 ## What is proven, and what is not
 
@@ -326,7 +342,7 @@ bridge/, relay/                      development harness, not shipped
 .\tools\run_tests.ps1
 ```
 
-187 checks in seven suites. The first five run on FreeCAD's own Python with
+203 checks in seven suites. The first five run on FreeCAD's own Python with
 nothing installed, which is the interpreter the addon actually runs on, so a
 pass there means a pass where it matters.
 
