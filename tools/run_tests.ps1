@@ -80,10 +80,26 @@ foreach ($suite in $suites) {
     Push-Location $root
     $errFile = [System.IO.Path]::GetTempFileName()
     try {
-        # Not "2>&1": PowerShell 5.1 wraps a native command's stderr in error
-        # records and sets $? to false, so a suite that passed while printing
-        # anything to stderr is reported as a failure. FreeCAD prints plenty.
-        $output = & $suite.Exe $suite.Script 2>$errFile | Out-String
+        # Two separate PowerShell 5.1 traps, and both of them made a passing
+        # suite look broken.
+        #
+        # Not "2>&1": redirecting a native command's stderr inside the
+        # pipeline wraps every line in an error record and sets $? to false,
+        # so a suite that passed while printing anything to stderr is
+        # reported as a failure. FreeCAD prints plenty.
+        #
+        # And "Stop" has to come off for the call itself. Those same error
+        # records are still raised with 2>$errFile, and under
+        # $ErrorActionPreference = "Stop" the first one is terminating, which
+        # killed the whole run on the first suite FreeCAD wrote a progress
+        # bar from.
+        $outer = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & $suite.Exe $suite.Script 2>$errFile | Out-String
+        } finally {
+            $ErrorActionPreference = $outer
+        }
         $stderr = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
     } finally {
         Pop-Location
