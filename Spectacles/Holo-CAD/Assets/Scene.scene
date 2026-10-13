@@ -230,10 +230,8 @@
     dropCm: true
     widthCm: true
     heightCm: true
-    handleHeightCm: true
     grabbable: true
     faceUser: true
-    handleObject: true
     cameraObject: true
   ScriptTypesDefault:
     {}
@@ -243,10 +241,8 @@
       dropCm: !<float> 18.000000
       widthCm: !<float> 46.000000
       heightCm: !<float> 22.000000
-      handleHeightCm: !<float> 5.000000
       grabbable: true
       faceUser: true
-      handleObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":
@@ -725,6 +721,7 @@
     buttonWidthCm: true
     spacingCm: true
     vertical: true
+    tapSlopCm: true
   ScriptTypesDefault:
     {}
   ScriptInputs:
@@ -736,6 +733,7 @@
       buttonWidthCm: !<float> 20.000000
       spacingCm: 1.500000
       vertical: true
+      tapSlopCm: 1.500000
   ScriptTypes:
     "":
       {}
@@ -2037,10 +2035,8 @@
   Enabled: true
   ScriptAsset: !<reference> 8b56a139-b7d2-49a7-a9d3-06ea8c3ccf7a
   ScriptInputsDefault:
-    handleHeightCm: true
     grabbable: true
     faceUser: true
-    handleObject: true
     cameraObject: true
   ScriptTypesDefault:
     {}
@@ -2050,10 +2046,8 @@
       dropCm: !<float> 0.000000
       widthCm: !<float> 24.000000
       heightCm: !<float> 26.000000
-      handleHeightCm: !<float> 5.000000
       grabbable: true
       faceUser: true
-      handleObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
       cameraObject: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
   ScriptTypes:
     "":

@@ -30,6 +30,9 @@ _pending = set()
 # model id -> digest of the GLB last sent, so an unchanged body is skipped
 _digests = {}
 
+# The point every body's position is measured from. See _shared_origin.
+_origin_mm = None
+
 
 # ----------------------------------------------------------------- logging
 
@@ -142,15 +145,23 @@ def server_running() -> bool:
 # -------------------------------------------------------------------- send
 
 
-def _digest(blob: bytes, scale: dict) -> str:
-    """What "unchanged" means: same geometry and same requested scale.
+def _digest(blob: bytes, scale: dict, offset=None) -> str:
+    """What "unchanged" means: everything the lens is told, not just the mesh.
 
-    Hashing only the GLB was wrong. Switching from 1:1 to 1:10 leaves the
-    bytes identical, so a scale change was silently dropped and pressing
-    Send appeared to do nothing.
+    Hashing only the GLB is not enough, twice over.
+
+    Switching from 1:1 to 1:10 leaves the bytes identical, so a scale change
+    was silently dropped and pressing Send appeared to do nothing.
+
+    And since each body's mesh is written about its own bottom centre, with
+    its position sent alongside, **moving** a body leaves the bytes
+    identical too. Live mode watched you drag a part across the document and
+    told the lens nothing. Found while porting this to Blender, where the
+    same design produced the same hole.
     """
-    marker = "{0}|{1}|{2}".format(
-        scale.get("mode"), scale.get("factor"), scale.get("target_mm"))
+    marker = "{0}|{1}|{2}|{3}".format(
+        scale.get("mode"), scale.get("factor"), scale.get("target_mm"),
+        offset)
     digest = hashlib.sha1(blob)
     digest.update(marker.encode("utf-8"))
     return digest.hexdigest()
@@ -187,18 +198,14 @@ def send(objs=None, doc=None, force=False) -> list:
     per_body = bool(settings.get("PerBody"))
     groups = [[obj] for obj in chosen] if per_body else [chosen]
 
-    # One origin for the whole send, so every part reports where it sits
-    # relative to the same point and the lens can rebuild the assembly.
-    # Without this each part was centred on itself and they all arrived on
-    # top of one another.
-    origin_mm = exporter.bottom_centre_mm(exporter.bounding_box_doc(chosen))
+    origin_mm = _shared_origin(chosen)
 
     sent = []
     unchanged = 0
     for group in groups:
         result = exporter.export(group, quality=quality, prefer_stock=prefer_stock,
                                  origin_mm=origin_mm)
-        digest = _digest(result["glb"], scale)
+        digest = _digest(result["glb"], scale, result.get("offset_mm"))
         slug = holocad_server.slugify(result["id"])
         if not force and _digests.get(slug) == digest:
             unchanged += 1
@@ -250,6 +257,28 @@ def send(objs=None, doc=None, force=False) -> list:
     return sent
 
 
+def _shared_origin(chosen):
+    """The point the whole document is measured from, worked out once.
+
+    Every part reports where it sits relative to this, which is what lets
+    the lens rebuild an assembly in the right shape. Without a shared origin
+    each part was centred on itself and they all arrived on top of one
+    another.
+
+    Held rather than recomputed per send, deliberately. Recomputing it looks
+    tidier and is wrong: moving one body changes the document bounds, which
+    changes the origin, which changes every other body's offset, so every
+    body is re-sent. Dragging one part of a 21 part model re-published all
+    21. Holding it also reads better: the origin is an anchor the model sits
+    at, and moving a part moves that part.
+    """
+    global _origin_mm
+    if _origin_mm is None:
+        _origin_mm = exporter.bottom_centre_mm(
+            exporter.bounding_box_doc(chosen))
+    return _origin_mm
+
+
 def _remove_vanished(server, chosen) -> None:
     """Tell the lens about anything no longer being exported.
 
@@ -271,8 +300,14 @@ def _remove_vanished(server, chosen) -> None:
 
 
 def forget_sent() -> None:
-    """Drop the change tracking, so the next send pushes everything again."""
+    """Drop the change tracking, so the next send pushes everything again.
+
+    The anchor goes too, so the document is re-measured and re-centred
+    rather than keeping an origin from whatever used to be in it.
+    """
+    global _origin_mm
     _digests.clear()
+    _origin_mm = None
 
 
 def send_selected() -> list:

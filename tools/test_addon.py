@@ -160,6 +160,29 @@ def main() -> int:
         check("its new size came through",
               round(message["bbox_mm"]["x"], 3) == 75.0, str(message["bbox_mm"]))
 
+        # Moving a body changes nothing in its GLB, because the mesh is
+        # written about its own bottom centre and the position is sent
+        # alongside. Live mode used to watch a part being dragged across
+        # the document and tell the lens nothing at all.
+        forced = service.send(doc=doc, force=True)
+        before = [m["offset_mm"] for m in forced]
+        for _ in forced:
+            client.read_json()  # consume, so the next read is the move
+        second.Placement.Base = FreeCAD.Vector(400, 0, 0)
+        doc.recompute()
+        moved = service.send(doc=doc)
+        check("moving a body re-sends it",
+              [m["id"] for m in moved] == ["Plate"], str([m["id"] for m in moved]))
+        check("with a new offset",
+              moved and moved[0]["offset_mm"] not in before,
+              "{0} was in {1}".format(moved[0]["offset_mm"] if moved else None, before))
+        # And only it: the shared origin is an anchor, not something
+        # recomputed from the bounds every send, or moving one body would
+        # change every other body's offset and re-send the lot.
+        check("and nothing else is", len(moved) == 1, str([m["id"] for m in moved]))
+        check("and the lens hears the move",
+              client.read_json()["id"] == "Plate")
+
         print("a deleted body is taken out of the lens")
         doc.removeObject(second.Name)
         doc.recompute()
