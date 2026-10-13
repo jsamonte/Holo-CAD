@@ -154,7 +154,7 @@ class _QuietServer(ThreadingHTTPServer):
             kind, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)
         ):
             return
-        self.log("Holo-CAD server error from {0}: {1}".format(
+        self.log("server error from {0}: {1}".format(
             client_address[0], sys.exc_info()[1]))
 
 
@@ -320,7 +320,7 @@ class Bridge:
         )
         self._thread.start()
         self.host_ip = lan_ip()
-        self._log("Holo-CAD serving on {0}".format(self.socket_url()))
+        self._log("serving on {0}".format(self.socket_url()))
         return self.socket_url()
 
     def stop(self) -> None:
@@ -336,7 +336,7 @@ class Bridge:
         if self._thread is not None:
             self._thread.join(timeout=5)
             self._thread = None
-        self._log("Holo-CAD server stopped")
+        self._log("server stopped")
 
     @property
     def running(self) -> bool:
@@ -406,7 +406,7 @@ class Bridge:
         self.store.put(model_id, version, glb, metadata)
         reached = self.broadcast(metadata)
         self._log(
-            "Holo-CAD sent {0} v{1}, {2:.1f} KB, {3:.1f} x {4:.1f} x {5:.1f} mm, "
+            "sent {0} v{1}, {2:.1f} KB, {3:.1f} x {4:.1f} x {5:.1f} mm, "
             "to {6} lens(es)".format(
                 model_id, version, len(glb) / 1024.0,
                 metadata["bbox_mm"]["x"], metadata["bbox_mm"]["y"], metadata["bbox_mm"]["z"],
@@ -425,7 +425,7 @@ class Bridge:
         if not self.store.drop(model_id):
             return False
         self.broadcast({"type": "model_remove", "id": model_id})
-        self._log("Holo-CAD removed {0}".format(model_id))
+        self._log("removed {0}".format(model_id))
         return True
 
     def known_ids(self) -> list:
@@ -591,8 +591,8 @@ def _make_handler(bridge: Bridge):
             peer = WebSocketPeer(self, base)
             bridge.add_peer(peer)
             if base:
-                bridge._log("Holo-CAD lens reached us at {0}".format(base))
-            bridge._log("Holo-CAD lens connected from {0} ({1} total)".format(
+                bridge._log("lens reached us at {0}".format(base))
+            bridge._log("lens connected from {0} ({1} total)".format(
                 self.client_address[0], bridge.lens_count))
 
             peer.send_text(json.dumps(
@@ -611,7 +611,7 @@ def _make_handler(bridge: Bridge):
             finally:
                 bridge.remove_peer(peer)
                 peer.closed = True
-                bridge._log("Holo-CAD lens disconnected ({0} left)".format(
+                bridge._log("lens disconnected ({0} left)".format(
                     bridge.lens_count))
 
         def _pump(self, peer):
